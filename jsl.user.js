@@ -4,8 +4,9 @@
 // @description   A JavaScript library used by JoeSimmons
 // @include       *
 // @copyright     JoeSimmons
-// @version       1.1.2
+// @version       1.1.3
 // @license       http://creativecommons.org/licenses/by-nc-nd/3.0/us/
+// @grant         none
 // ==/UserScript==
 
 
@@ -18,7 +19,20 @@
 
 
 
+/*
+
+    Wiki page ==> https://github.com/joesimmons/jsl/wiki/
+
+*/
+
+
+
 /* CHANGELOG
+
+1.1.3 (9/20/2013)
+    - drastic change. made JSL more similar jQuery
+        the main methods (JSL.runAt, JSL.addScript, etc) are the same but the
+        DOM methods are different. read the wiki
 
 1.1.2 (9/17/2013)
     - updated JSL.create a little
@@ -96,64 +110,268 @@
 
 */
 
-var JSL = new (function () {
+(function (window, undefined) {
 
     'use strict'; // use strict mode in ECMAScript-5
 
     var intervals = []; // initialize an array for the [set/clear]Interval methods
-    var thisLib = { // 'thisLib' will be a reference to JSL's methods + properties
+    var rSelector = /^\*$|^\.[a-zA-Z][a-zA-Z0-9-_]*|^#[^ ]+|^[a-zA-Z]+/; // RegExp for matching a CSS selector
+    var rXpath = /^\.?\/{1,2}[a-zA-Z]+/; // RegExp for matching an XPath selector
+
+    // 'core' original methods
+    var core = {
+        'array' : {
+            'slice' : Array.prototype.slice,
+            'forEach' : Array.prototype.forEach
+        },
+        'object' : {
+            'toString' : Object.prototype.toString
+        },
+        'element' : {
+            'getAttribute' : Element.prototype.getAttribute,
+            'setAttribute' : Element.prototype.setAttribute,
+            'hasAttribute' : Element.prototype.hasAttribute
+        },
+        'node' : {
+            'appendChild' : Node.prototype.appendChild
+        },
+        'eventtarget' : {
+            'addEventListener' : EventTarget.prototype.addEventListener,
+            'attachEvent' : EventTarget.prototype.attachEvent
+        }
+    };
+
+    var JSL = function (selector, context) {
+        return new JSL.fn.init(selector, context);
+    };
+
+    var handlers = {
+        'stack' : [],
+
+        'get' : function (elem) {
+            var events = [], name;
+
+            core.array.forEach.call(this.stack, function (thisEventObj) {
+                if (thisEventObj.element === elem) {
+                    events.push(thisEventObj);
+                }
+            });
+
+            return events;
+        },
+
+        'add' : function (thisEventObj) {
+            this.stack.push(thisEventObj);
+        }
+    };
+
+    // internal function for throwing errors, so the user gets
+    // some sort of hint as to why their operation failed
+    function error(content) {
+        var errorString = '!! - ' + content + ' - !!';
+
+        if ( content && (typeof content === 'string' || typeof content === 'number') ) {
+            if ('Error' in window) {
+                throw new Error(errorString);
+            } else if ( 'console' in window && (typeof console.error === 'function' || typeof console.error === 'function') ) {
+                (console.log || console.error)(errorString);
+            }
+        }
+    }
+
+    // function to easily allow an original function to be called
+    // even if it gets changed later on
+    function orig(fn, otherThis) {
+        return function () {
+            var oThis = otherThis || this;
+            return fn.apply(oThis, arguments);
+        };
+    }
+
+    // define JSL's prototype, aka JSL.fn
+    JSL.fn = JSL.prototype = {
+        isJSL : true,
+        constructor : JSL,
+        length : 0,
+
+        // similar to jQuery. JSL is just the init constructor
+        init : function (selector, context) {
+            var that = this, elems;
+
+            //delete that.init;
+
+            if (typeof selector === 'string') {
+                if ( rSelector.test(selector) ) {
+                    elems = document.querySelectorAll(selector);
+                } else if ( rXpath.test(selector) ) {
+                    elems = JSL.toArray( JSL.xpath({expression : selector}) );
+                }
+            } else if (typeof selector === 'object') {
+                elems = [selector];
+            }
+
+            if (elems.length > 0) {
+                that.length = elems.length;
+                core.array.forEach.call(elems, function (value, index) {
+                    that[index] = value;
+                });
+            }
+
+            return that;
+        },
+
+        addEvent : function (type, fn) {
+            JSL.addEvent(this, type, fn);
+            return this;
+        },
+
+        after : function (newElement) {
+            var thisElement = !!this ? this[0] : null,
+                parent = thisElement.parentNode,
+                next = thisElement.nextSibling;
+
+            if (thisElement && parent && next) {
+                parent.insertBefore(newElement, next);
+            }
+
+            return this;
+        },
+
+        append : function (passedElement) {
+            // filter null/undefined values
+            if (passedElement != null) {
+                this.each(function (thisElement, index, thisArray) {
+                    var newElement = passedElement.cloneNode(true),
+                        theseEvents;
+
+                    // clone event listeners of passedElement
+                    core.array.forEach.call(handlers.get(passedElement), function (thisEventObj) {
+                        JSL.addEvent(newElement, thisEventObj.type, thisEventObj.fn);
+                    });
+
+                    if (typeof thisElement.appendChild === 'function') {
+                        core.node.appendChild.call( thisElement, newElement );
+                    }
+                });
+            }
+
+            return this;
+        },
+
+        array : function () {
+            return JSL.toArray(this);
+        },
+
+        attribute : function (name, value) {
+            if (typeof name === 'string' && this.length > 0) {
+                if (typeof value === 'string') {
+                    // handle setting attributes
+                    this.each(function (elem) {
+                        core.element.setAttribute.call(elem, name, value);
+                    });
+                } else {
+                    // handle getting attributes
+                    return this[0].getAttribute(name);
+                }
+            }
+
+            return this;
+        },
+
+        before : function (newElement) {
+            var thisElement = !!this ? this[0] : null,
+                parent = thisElement.parentNode;
+
+            if (thisElement && parent) {
+                parent.insertBefore(newElement, thisElement);
+            }
+
+            return this;
+        },
+
+        each : function (fn, oThis) {
+            core.array.forEach.call(this, fn, oThis);
+            return this;
+        }
+    };
+
+    // give the init function the JSL prototype for later instantiation
+    JSL.fn.init.prototype = JSL.fn;
+
+    // extend method. can extend any object it's run upon
+    JSL.fn.extend = JSL.extend = function (obj) {
+        var name, copy;
+
+        for (name in obj) {
+            copy = obj[name];
+
+            if ( !this.hasOwnProperty(name) && copy !== undefined ) {
+                Object.defineProperty(this, name, {
+                    value : copy
+                });
+            }
+        }
+    }
+
+    // these methods will get added directly to 'JSL'
+    JSL.extend({
+        // internal function for adding event listeners
+        addEvent : function (element, type, fn) {
+            // function for attaching the listener
+            function doAdd(elem, type, fn) {
+                var method = core.eventtarget.addEventListener || core.eventtarget.attachEvent;
+
+                method.call(elem, type, function () {
+                    return fn.apply(elem, arguments);
+                }, false);
+            }
+
+            if (element && typeof type === 'string' && typeof fn === 'function') {
+                if (element.isJSL && typeof element.each === 'function') {
+                    element.each(function (elem) {
+                        doAdd(elem, type, fn);
+                        handlers.add({
+                            'type' : type,
+                            'fn' : fn,
+                            'element' : elem
+                        });
+                    });
+                } else {
+                    doAdd(element, type, fn);
+                    handlers.add({
+                        'type' : type,
+                        'fn' : fn,
+                        'element' : element
+                    });
+                }
+            }
+
+            return this;
+        },
 
         // adds a script tag to the page
         // syntax: JSL.addScript( 'var x = 0;' , null , head_node )
         // 2nd argument required but technically optional. it will set the ID of the script tag. pass it null if you want a random ID
         // 3rd argument optional. it will add the style tag to the head if omitted
         addScript : function (contents, id, node) {
-            node = node || thisLib.query('head');
+            id = id || ( 'jsl-script-' + this.random(999) );
+            node = node || this.query('head');
             node.appendChild(
-                thisLib.create('script', { 'id' : (id || ( 'jsl-script-' + thisLib.random(999) ) ), innerHTML: contents } )
+                this.create('script', { 'id' : id, innerHTML: contents } )
             );
         },
 
         // adds a style to the node you want, or the head node of the current document
         // syntax: JSL.addStyle( '.classname { color: red; }' , document )
         // 2nd argument is optional
-        addStyle : function (css, node) {
-            var style = thisLib.create('style', {type : 'text/css'}, [ thisLib.create('text', css) ] );
-            node = node || thisLib.query('head');
+        // 3rd argument is optional
+        addStyle : function (css, id, node) {
+            id = id || ( 'jsl-style-' + this.random(999) );
+            node = node || this.query('head');
             if (node) {
-                node.appendChild(style);
-            }
-        },
-
-        // adds a node after the node you specify in the second argument
-        // syntax: JSL.after(newElement, currentElement)
-        after : function (newElement, currentElement) {
-            currentElement = thisLib.elem(currentElement);
-            if (currentElement) {
-                currentElement.parentNode.insertBefore(newElement, currentElement.nextSibling);
-            }
-        },
-
-        // adds a node before the node you specify in the second argument
-        // syntax: JSL.before(newElement, currentElement)
-        before : function (newElement, currentElement) {
-            currentElement = thisLib.elem(currentElement);
-            if (currentElement) {
-                currentElement.parentNode.insertBefore(newElement, currentElement);
-            }
-        },
-
-        // return the browser name
-        // syntax: JSL.browser
-        get browser() {
-            // this feature isn't fully implemented yet
-            // i suggest not using it. just use feature detection instead
-            if (window.opera) {
-                return 'opera';
-            } else if (window.chrome) {
-                return 'chrome';
-            } else if (typeof GM_info !== 'undefined') {
-                return 'firefox';
+                node.appendChild(
+                    this.create('style', {type : 'text/css'}, [ this.create('text', css) ] )
+                );
             }
         },
 
@@ -181,11 +399,11 @@ var JSL = new (function () {
                     return document.createTextNode(attr);
                 }
 
-                if (thisLib.typeOf(attr) === 'object') {
+                if (this.typeOf(attr) === 'object') {
                     for (prop in attr) {
                         val = attr[prop];
                         if (prop.indexOf('on') === 0 && typeof val === 'function') {
-                            ret.addEventListener(prop.substring(2), val, false);
+                            JSL.addEvent(ret, prop.substring(2), val);
                         } else if (typeof ret[prop] !== 'undefined' && !blacklist.test(prop) ) {
                             ret[prop] = val;
                         } else {
@@ -194,7 +412,7 @@ var JSL = new (function () {
                     }
                 }
 
-                if (thisLib.typeOf(kids) === 'array') {
+                if (this.typeOf(kids) === 'array') {
                     kids.forEach(function (kid) {
                         ret.appendChild(kid);
                     });
@@ -206,58 +424,23 @@ var JSL = new (function () {
 
         // function to take a string or an element and return an element/xpath-snapshots
         // not intended for user use, it's only used in other methods in this library
-        elem : (function () {
-            var query = /#|\.|\[|\]|"|'|=|,|:/;
-
-            return function (val) {
-                var ret = val;
-                if (typeof val === 'string') {
-                    if (val.indexOf('//') !== -1 || val.indexOf('./') !== -1) {    // test for xpath
-                        ret = thisLib.xpath(val);
-                    } else if ( query.test(val) ) {                                // test for query selector
-                        ret = thisLib.queryAll(val);
-                        if (ret.length === 1) {
-                            ret = ret[0];
-                        } else if (ret.length === 0) {
-                            return null;
-                        }
-                    } else {                                                       // just get ID
-                        ret = thisLib.id(val);
+        elem : function (val) {
+            if (typeof val === 'string') {
+                if ( rXpath.test(val) ) {                      // test for xpath
+                    val = this.xpath(val);
+                } else if ( rSelector.test(val) ) {           // test for query selector
+                    val = document.querySelectorAll(val);
+                    if (val.length === 1) {
+                        val = val[0];
+                    } else if (val.length === 0) {
+                        return null;
                     }
+                } else {                                      // just get ID
+                    val = document.getElementById(val);
                 }
-                return ret;
-            };
-        }()),
-
-        // hide an element
-        // syntax: JSL.hide( element )
-        hide : function (element) {
-            element = thisLib.elem(element);
-            if (element) {
-                element.style.display = 'none';
             }
-        },
 
-        // return an element by id
-        // syntax: JSL.id( 'some_id' , context_element )
-        id : function (id, node) {
-            return typeof node !== 'undefined' ? thisLib.query('#' + id, node) : document.getElementById(id);
-        },
-
-        // return an element by query selector
-        // syntax: JSL.query( '.someclass' , context_element )
-        // 2nd argument is optional
-        query : function (query, n) {
-            var node = typeof n !== 'undefined' ? (n || null) : document;
-            return node === null ? null : node.querySelector(query);
-        },
-
-        // return elements by query selector
-        // syntax: JSL.queryAll( '.someclass' , context_element )
-        // 2nd argument is optional
-        queryAll : function (query, n) {
-            var node = typeof n !== 'undefined' ? (n || null) : document;
-            return node.querySelectorAll(query);
+            return val;
         },
 
         // return a random integer, floored
@@ -267,29 +450,12 @@ var JSL = new (function () {
             return rand > 0 ? rand : 1;
         },
 
-        // remove an element from its parent
-        // syntax: JSL.remove( element )
-        remove : function (element) {
-            element = thisLib.elem(element);
-            if (element) {
-                element.parentNode.removeChild(element);
-            }
-        },
-
-        // replace an old element with a new one
-        // syntax: JSL.replace( old_elem, new_elem )
-        replace : function (oldNode, newNode) {
-            oldNode = thisLib.elem(oldNode);
-            if (oldNode) {
-                oldNode.parentNode.replaceChild(newNode, oldNode);
-            }
-        },
-
         // run a function at a specified document readyState
         // syntax: JSL.runAt( 'complete', someFunc, thisValue[, ...otherArguments] );
         runAt : function (state, func, oThis) {
-            var args = Array.prototype.slice.call(arguments, 0),
-                states = ['uninitialized', 'loading', 'interactive', 'complete'];
+            var args = JSL.toArray(arguments),
+                states = ['uninitialized', 'loading', 'interactive', 'complete'],
+                that = this, runFunc, checkState
 
             // in-case they pass 'start' or 'end' instead of 'loading' or 'complete'
             state = state.replace('start', 'loading').replace('end', 'complete');
@@ -297,18 +463,24 @@ var JSL = new (function () {
             // set 'this' for the passed function to be run
             oThis = oThis || window;
 
-            // this will re-run this runAt function with the same arguments it was given
-            function rerunThis() {
-                thisLib.runAt.apply(null, args);
-            }
+            runFunc = function () {
+                func.apply( oThis, args.slice(3) );
+            };
+
+            checkState = function () {
+                if (document.readyState === state) {
+                    runFunc();
+                    document.removeEventListener('readystatechange', checkState, false);
+                }
+            };
 
             if ( states.indexOf(state) <= states.indexOf(document.readyState) ) {
                 // we are at, or have missed, our desired state
                 // run the function with the proper 'this' and arguments
-                func.apply( oThis, args.slice(3) );
+                runFunc();
             } else {
                 // re-run runAt until the desired state is achieved
-                document.addEventListener('readystatechange', rerunThis, false);
+                document.addEventListener('readystatechange', checkState, false);
             }
         },
 
@@ -355,49 +527,28 @@ var JSL = new (function () {
             return index;
         },
 
-        // show an element
-        // syntax: JSL.show( element )
-        show : function (element) {
-            element = thisLib.elem(element);
-            if (element) {
-                element.style.display = '';
-            }
-        },
-
         // converts a list of some sort to an array (e.g., NodeList, HTMLCollection, 'arguments' parameter, xpath snapshots, etc)
         // syntax: JSL.toArray( some_list )
         toArray : function (arr) {
-            var len = arr.length || arr.snapshotLength, newArr = [], item, i;
-            if (typeof len === 'number' && thisLib.typeOf(arr) !== 'array') {
+            var len = arr.length || arr.snapshotLength,
+                newArr = [],
+                xpath = typeof arr.snapshotItem === 'function',
+                item, i;
+
+            if (typeof len === 'number' && this.typeOf(arr) !== 'array') {
                 for (i = 0; i < len; i += 1) {
-                    if (typeof arr.snapshotItem === 'function') {
-                        newArr.push( arr.snapshotItem(i) );
-                    } else {
-                        newArr.push( arr[i] );
-                    }
+                    newArr.push( xpath === true ? arr.snapshotItem(i) : arr[i] );
                 }
                 return newArr;
             }
-            return arr;
-        },
 
-        // toggle display of an element
-        // syntax: JSL.toggle( element )
-        toggle : function (element) {
-            element = thisLib.elem(element);
-            if (element) {
-                if (element.style.display === 'none') {
-                    thisLib.show(element);
-                } else {
-                    thisLib.hide(element);
-                }
-            }
+            return arr;
         },
 
         // typeOf by Douglas Crockford. modified by JoeSimmons
         typeOf : function (value) {
             var s = typeof value,
-                ostr = Object.prototype.toString.call(value);
+                ostr = core.object.toString.call(value);
             if (s === 'object') {
                 if (value) {
                     if (ostr === '[object Array]') {
@@ -421,22 +572,58 @@ var JSL = new (function () {
         // return an xpath result    (type + context are optional)
         // syntax: JSL.xpath( { expression : '//a', type : 6, context : document } )
         xpath : function (obj) {
-            var type = obj['type'] || 6,
-                xp = document.evaluate( ( obj['expression'] ), ( obj['context'] || document ), null, type, null);
+            var type = obj.type || 6,
+                types = {
+                    '1' : 'numberValue',
+                    '2' : 'stringValue',
+                    '3' : 'booleanValue',
+                    '8' : 'singleNodeValue',
+                    '9' : 'singleNodeValue'
+                },
+                expression = obj.expression || '',
+                context = obj.context || document,
+                xp;
 
-            switch(type) {
-                case 1: xp = xp.numberValue; break;
-                case 2: xp = xp.stringValue; break;
-                case 3: xp = xp.booleanValue; break;
-                case 8: case 9: xp = xp.singleNodeValue; break;
-                default: break;
+            if (!expression) {
+                error('An expression must be supplied for JSL.xpath()');
             }
 
-            return xp;
+            return typeof types[type] === 'string' ? xp[ types[type] ] : xp;
         }
+    });
 
-    };
+    window.JSL = JSL;
 
-    return thisLib;
+}(window));
+
+
+
+// -
+// --
+// ---
+// -----
+// ------- BELOW IS FOR TESTING --------
+// -----
+// ---
+// --
+// -
+
+
+
+// Make sure the page is not in a frame
+if (window.self !== window.top) { return; }
+
+
+JSL.runAt('end', function () {
+
+    // grab the element[s]
+    var a = JSL('body div');
+
+    // do stuff to them
+    a.append(
+        JSL.create('a', {href: '#', onclick : function () {
+            alert('JSL.create() onclick cloned node, with cloned event listeners.');
+        }, textContent : '-- JSL TEST --', style : 'z-index: 999999; padding: 2px 4px; margin: 4px; color: red; font-size: 18pt;'})
+    );
 
 });
