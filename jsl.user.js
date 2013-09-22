@@ -122,7 +122,8 @@
     var core = {
         'array' : {
             'slice' : Array.prototype.slice,
-            'forEach' : Array.prototype.forEach
+            'forEach' : Array.prototype.forEach,
+            'map' : Array.prototype.map
         },
         'object' : {
             'toString' : Object.prototype.toString
@@ -133,7 +134,9 @@
             'hasAttribute' : Element.prototype.hasAttribute
         },
         'node' : {
-            'appendChild' : Node.prototype.appendChild
+            'appendChild' : Node.prototype.appendChild,
+            'removeChild' : Node.prototype.removeChild,
+            'replaceChild' : Node.prototype.replaceChild
         },
         'eventtarget' : {
             'addEventListener' : EventTarget.prototype.addEventListener,
@@ -188,6 +191,19 @@
         };
     }
 
+    // will copy an element and return a new copy with
+    // the same event listeners
+    function cloneElement(element) {
+        var newElement = element.cloneNode(true);
+
+        // clone event listeners of element
+        core.array.forEach.call(handlers.get(element), function (thisEventObj) {
+            JSL.addEvent(newElement, thisEventObj.type, thisEventObj.fn);
+        });
+
+        return newElement;
+    }
+
     // define JSL's prototype, aka JSL.fn
     JSL.fn = JSL.prototype = {
         isJSL : true,
@@ -240,18 +256,9 @@
         append : function (passedElement) {
             // filter null/undefined values
             if (passedElement != null) {
-                this.each(function (thisElement, index, thisArray) {
-                    var newElement = passedElement.cloneNode(true),
-                        theseEvents;
-
-                    // clone event listeners of passedElement
-                    core.array.forEach.call(handlers.get(passedElement), function (thisEventObj) {
-                        JSL.addEvent(newElement, thisEventObj.type, thisEventObj.fn);
-                    });
-
-                    if (typeof thisElement.appendChild === 'function') {
-                        core.node.appendChild.call( thisElement, newElement );
-                    }
+                this.each(function (element) {
+                    var newElement = cloneElement(passedElement);
+                    core.node.appendChild.call(element, newElement);
                 });
             }
 
@@ -292,6 +299,50 @@
         each : function (fn, oThis) {
             core.array.forEach.call(this, fn, oThis);
             return this;
+        },
+
+        hide : function (element) {
+            return this.each(function (element) {
+                element.style.display = 'none';
+            });
+        },
+
+        remove : function () {
+            return this.each(function (element) {
+                var parent = element.parentNode;
+                if (element && parent) {
+                    core.node.removeChild.call(parent, element);
+                }
+            });
+        },
+
+        replace : function (passedElement) {
+            return this.each(function (element, index) {
+                var newElement = cloneElement(passedElement),
+                    parent = element.parentNode;
+                if (element && parent) {
+                    core.node.replaceChild.call(parent, newElement, element);
+                    this[index] = newElement;
+                }
+            }, this);
+        },
+
+        show : function (element) {
+            return this.each(function (element) {
+                element.style.display = '';
+            });
+        },
+        
+        text : function () {
+            return core.array.map.call(this, function (element) {
+                return element.textContent;
+            }).join('');
+        },
+
+        toggle : function () {
+            return this.each(function (element) {
+                element.style.display = element.style.display === 'none' ? '' : 'none';
+            });
         }
     };
 
@@ -599,16 +650,17 @@
 
 
 // -
-// --
 // ---
 // -----
-// ------- BELOW IS FOR TESTING --------
+// -------
+// ----------- BELOW IS FOR TESTING ------------
+// -------
 // -----
 // ---
-// --
 // -
 
 
+/*
 
 // Make sure the page is not in a frame
 if (window.self !== window.top) { return; }
@@ -616,14 +668,16 @@ if (window.self !== window.top) { return; }
 
 JSL.runAt('end', function () {
 
-    // grab the element[s]
-    var a = JSL('body div');
+    var newNode = JSL.create('a', {textContent : 'hello world', onclick : function (event) {
+        alert(this);
+        event.preventDefault();
+    }});
 
-    // do stuff to them
-    a.append(
-        JSL.create('a', {href: '#', onclick : function () {
-            alert('JSL.create() onclick cloned node, with cloned event listeners.');
-        }, textContent : '-- JSL TEST --', style : 'z-index: 999999; padding: 2px 4px; margin: 4px; color: red; font-size: 18pt;'})
-    );
-
+    var a = JSL('a');
+    
+    JSL.setInterval(function () {
+        a.toggle();
+    }, 1000);
 });
+
+*/
