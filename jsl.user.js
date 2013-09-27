@@ -33,9 +33,9 @@
 
 1.1.3 (9/20/2013)
     - added an alias to JSL
-        JSL can now also be used (by default) by using _j()
-        (underscore and lower-case J)
-        e.g., _j('#foo').show()
+        JSL can now also be used (by default) by using _J()
+        (underscore and upper-case J)
+        e.g., _J('#foo').show()
     - drastic change. made JSL more similar to jQuery
         the main methods (JSL.runAt, JSL.addScript, etc) are the same but the
         DOM methods are different. the elements are in a wrapper now, like JSL('#foo').show()
@@ -721,6 +721,8 @@
         }
     });
 
-    win.JSL = win._j = JSL;
+    // assign JSL to the window object
+    // (and unsafeWindow/unwrapped-window if in a user script)
+    win.JSL = win._J = window.JSL = window._J = JSL;
 
 }(window));
