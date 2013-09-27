@@ -238,6 +238,19 @@
         }, false);
     }
 
+    // this will add all the childNodes of the
+    // passed document fragment to 'arrayToAddTo'
+    // if not a document fragment, it will just add that element to 'arrayToAddTo'
+    function addNewReturnElements(newElement, arrayToAddTo) {
+        if (newElement.nodeType === 11) {
+            core.forEach.call(newElement.childNodes, function (thisNewElement) {
+                arrayToAddTo.push(thisNewElement);
+            });
+        } else {
+            arrayToAddTo.push(newElement);
+        }
+    }
+
     // define JSL's prototype, aka JSL.fn
     JSL.fn = JSL.prototype = {
         isJSL : true,
@@ -252,13 +265,15 @@
                 if ( rSelector.test(selector) ) {
                     elems = document.querySelectorAll(selector);
                 } else if ( rXpath.test(selector) ) {
-                    elems = JSL.xpath({expression : selector, type : 7});
+                    elems = JSL.xpath({expression : selector, type : 7, context : context});
                 } else if ( rHTML.test(selector) ) {
                     // code
                 }
-            } else if (typeof selector === 'object') {
+            } else if (typeof selector === 'object' && selector != null) {
                 if (selector.isJSL === true) {
                     return selector;
+                } else if (JSL.typeOf(selector) === 'array' && selector.length > 0) {
+                    elems = selector;
                 } else {
                     elems = [selector];
                 }
@@ -286,6 +301,8 @@
         },
 
         after : function (passedElement) {
+            var newElementsArray = [];
+
             passedElement = handleHTMLcreation(passedElement);
 
             // filter null/undefined values
@@ -295,31 +312,46 @@
                         parent = element.parentNode,
                         next = element.nextSibling;
 
-                    if (parent && next) {
-                        // add the newElement after the current element, if possible
-                        core.insertBefore.call(parent, newElement, next);
-                    } else if (parent) {
-                        // nextSibling didn't exist. just append to its parent
-                        core.appendChild.call(parent, newElement);
+                    if (parent) {
+                        // add the new elements to the new elements array
+                        // this is so that what's returned is a JSL object
+                        // containing the new elements, not the old ones
+                        addNewReturnElements(newElement, newElementsArray);
+
+                        if (next) {
+                            // add the newElement after the current element
+                            core.insertBefore.call(parent, newElement, next);
+                        } else {
+                            // nextSibling didn't exist. just append to its parent
+                            core.appendChild.call(parent, newElement);
+                        }
                     }
                 });
             }
 
-            return this;
+            return JSL(newElementsArray);
         },
 
         append : function (passedElement) {
+            var newElementsArray = [];
+
             passedElement = handleHTMLcreation(passedElement);
 
             // filter null/undefined values
             if (passedElement != null) {
                 this.each(function (element) {
                     var newElement = cloneElement(passedElement);
+
+                    // add the new elements to the new elements array
+                    // this is so that what's returned is a JSL object
+                    // containing the new elements, not the old ones
+                    addNewReturnElements(newElement, newElementsArray);
+
                     core.appendChild.call(element, newElement);
                 });
             }
 
-            return this;
+            return JSL(newElementsArray);
         },
 
         attribute : function (name, value) {
@@ -339,6 +371,8 @@
         },
 
         before : function (passedElement) {
+            var newElementsArray = [];
+
             passedElement = handleHTMLcreation(passedElement);
 
             // filter null/undefined values
@@ -348,13 +382,18 @@
                         parent = element.parentNode;
 
                     if (parent) {
-                        // add the newElement before the current element, if possible
+                        // add the new elements to the new elements array
+                        // this is so that what's returned is a JSL object
+                        // containing the new elements, not the old ones
+                        addNewReturnElements(newElement, newElementsArray);
+
+                        // add the newElement before the current element
                         core.insertBefore.call(parent, newElement, element);
                     }
                 });
             }
 
-            return this;
+            return JSL(newElementsArray);
         },
 
         each : function (fn, oThis) {
@@ -363,7 +402,33 @@
         },
 
         exists : function () {
-            return ('0' in this);
+            return this.length > 0;
+        },
+
+        first : function (passedElement) {
+            var newElementsArray = [];
+
+            passedElement = handleHTMLcreation(passedElement);
+
+            // filter null/undefined values
+            if (passedElement != null) {
+                this.each(function (element) {
+                    var newElement = cloneElement(passedElement),
+                        firstChild = element.firstChild;
+
+                    if (firstChild) {
+                        // add the new elements to the new elements array
+                        // this is so that what's returned is a JSL object
+                        // containing the new elements, not the old ones
+                        addNewReturnElements(newElement, newElementsArray);
+
+                        // add the newElement before the current element's first child
+                        core.insertBefore.call(element, newElement, firstChild);
+                    }
+                });
+            }
+
+            return JSL(newElementsArray);
         },
 
         hide : function () {
@@ -384,23 +449,42 @@
         },
 
         replace : function (passedElement) {
+            var newElementsArray = [];
+
             passedElement = handleHTMLcreation(passedElement);
 
-            return this.each(function (element, index) {
+            this.each(function (element, index) {
                 var newElement = cloneElement(passedElement),
                     parent = element.parentNode;
+
                 if (element && parent) {
+                    // add the new elements to the new elements array
+                    // this is so that what's returned is a JSL object
+                    // containing the new elements, not the old ones
+                    addNewReturnElements(newElement, newElementsArray);
+
                     core.replaceChild.call(parent, newElement, element);
-                    this[index] = newElement;
                 }
             }, this);
+
+            return JSL(newElementsArray);
         },
 
         show : function () {
             return this.each(changeStyleDisplay, '');
         },
         
-        text : function () {
+        text : function (passedText) {
+            // handle setting text
+            if (typeof passedText === 'string') {
+                return this.each(function (element) {
+                    if ('textContent' in element) {
+                        element.textContent = passedText;
+                    }
+                });
+            }
+
+            // handle getting text
             return core.map.call(this, function (element) {
                 return element.textContent;
             }).join('');
@@ -532,7 +616,7 @@
                     val = attr[prop];
                     if (prop.indexOf('on') === 0 && typeof val === 'function') {
                         JSL.addEvent(ret, prop.substring(2), val);
-                    } else if ( typeof ret.__lookupSetter__(prop) === 'function' ) {
+                    } else if ( prop in ret && typeof ret[prop] !== 'undefined' ) {
                         ret[prop] = val;
                     } else {
                         core.setAttribute.call(ret, prop, val);
@@ -706,7 +790,8 @@
                 },
                 expression = obj.expression,
                 context = obj.context || document,
-                xp = document.evaluate(expression, context, null, type, null);
+                doc = context.evaluate ? context : document,
+                xp = doc.evaluate(expression, context, null, type, null);
 
             if (!expression) {
                 error('An expression must be supplied for JSL.xpath()');
