@@ -136,9 +136,12 @@
     }(window);
 
     var intervals = []; // initialize an array for the [set/clear]Interval methods
-    var rSelector = /^\*$|^\.[a-zA-Z][a-zA-Z0-9-_]*|^#[^ ]+|^[a-zA-Z]+/; // RegExp for matching a CSS selector
-    var rXpath = /^\.?\/{1,2}[a-zA-Z\*]+/; // RegExp for matching an XPath selector
-    var rHTML = /<[^>]+>/; // RegExp for matching HTML strings
+
+    // regular expressions
+    var rSelector = /^\*$|^\.[a-zA-Z][a-zA-Z0-9-_]*|^#[^ ]+|^[a-zA-Z]+/;      // matches a CSS selector
+    var rXpath = /^\.?\/{1,2}[a-zA-Z\*]+/;                                    // matches an XPath selector
+    var rHTML = /<[^>]+>/;                                                    // matches HTML strings
+    var rHyphenated = /-[a-z]/g;                                              // matches hyphenated strings
 
     // original methods for some common uses
     var core = {
@@ -263,16 +266,18 @@
 
             if (typeof selector === 'string') {
                 if ( rSelector.test(selector) ) {
-                    elems = document.querySelectorAll(selector);
+                    context = context != null && context.querySelectorAll ? context : document;
+                    elems = context.querySelectorAll(selector);
                 } else if ( rXpath.test(selector) ) {
                     elems = JSL.xpath({expression : selector, type : 7, context : context});
                 } else if ( rHTML.test(selector) ) {
-                    // code
+                    // reserved for html code creation
+                    // not sure if I want to implement it
                 }
             } else if (typeof selector === 'object' && selector != null) {
                 if (selector.isJSL === true) {
                     return selector;
-                } else if (JSL.typeOf(selector) === 'array' && selector.length > 0) {
+                } else if (selector.length && '0' in selector) {
                     elems = selector;
                 } else {
                     elems = [selector];
@@ -280,7 +285,6 @@
             }
 
             if (elems.length > 0) {
-
                 // define the length property of our object wrapper
                 that.length = elems.length;
 
@@ -289,7 +293,6 @@
                 core.forEach.call(elems, function (value, index) {
                     that[index] = value;
                 });
-
             }
 
             return that;
@@ -355,16 +358,16 @@
         },
 
         attribute : function (name, value) {
-            if (typeof name === 'string' && this.length > 0) {
+            if ( typeof name === 'string' && this.exists() ) {
                 if (typeof value === 'string') {
                     // handle setting attributes
                     this.each(function (elem) {
                         core.setAttribute.call(elem, name, value);
                     });
-                } else {
-                    // handle getting attributes
-                    return core.getAttribute.call(this[0], name);
                 }
+
+                // handle getting attributes if there was no second argument
+                return core.getAttribute.call(this[0], name);
             }
 
             return this;
@@ -396,13 +399,44 @@
             return JSL(newElementsArray);
         },
 
+        css : function (name, value) {
+            if (typeof name === 'string') {
+                name = name.toLowerCase().replace(rHyphenated, function (thisMatch) {
+                    return thisMatch.substring(1).toUpperCase();
+                });
+
+                if (typeof value === 'string') {
+                    return this.each(function (thisElement) {
+                        if (name in thisElement.style) {
+                            thisElement.style[name] = value;
+                        }
+                    });
+                } else {
+                    return core.map.call(this, function (thisElement) {
+                        var thisStyle = thisElement.style[name]
+                        return typeof thisStyle !== 'undefined' ? thisStyle : '';
+                    }).join('');
+                }
+            }
+        },
+
         each : function (fn, oThis) {
             core.forEach.call(this, fn, oThis);
             return this;
         },
 
         exists : function () {
-            return this.length > 0;
+            return this.length > 0 && this[0] != null;
+        },
+
+        filter : function (selector) {
+            // add the current elements to a document fragment
+            var documentFragment = document.createDocumentFragment();
+            this.each(function (thisElement) {
+                documentFragment.appendChild( cloneElement(thisElement) );
+            });
+
+            return JSL(selector, documentFragment);
         },
 
         first : function (passedElement) {
@@ -487,7 +521,7 @@
             // handle getting text
             return core.map.call(this, function (element) {
                 return element.textContent;
-            }).join('');
+            }).join('').trim();
         },
 
         toggle : function () {
