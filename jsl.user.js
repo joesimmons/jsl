@@ -186,6 +186,21 @@
         }
     };
 
+    // walkTheDom by Douglas Crockford
+    var walkTheDom = function walkTheDom(node, func) {
+        func(node);
+        node = node.firstChild;
+
+        while (node) {
+            walkTheDom(node, func);
+            node = node.nextSibling;
+        }
+    };
+
+    function pluck(item) {
+        return item[this];
+    }
+
     // internal function for throwing errors, so the user gets
     // some sort of hint as to why their operation failed
     function error(content) {
@@ -508,20 +523,26 @@
             return this.each(changeStyleDisplay, '');
         },
         
-        text : function (passedText) {
+        text : function (passedText, append) {
             // handle setting text
             if (typeof passedText === 'string') {
+                append = append === true;
                 return this.each(function (element) {
-                    if ('textContent' in element) {
-                        element.textContent = passedText;
+                    if (append) {
+                        core.appendChild.call( element, document.createTextNode(passedText) );
+                    } else {
+                        walkTheDom(element, function (thisElement) {
+                            if (thisElement.nodeType === 3) {
+                                thisElement.nodeValue = '';
+                            }
+                        });
+                        core.appendChild.call( element, document.createTextNode(passedText) );
                     }
                 });
             }
 
             // handle getting text
-            return core.map.call(this, function (element) {
-                return element.textContent;
-            }).join('').trim();
+            return core.map.call(this, pluck, 'textContent').join('').trim();
         },
 
         toggle : function () {
