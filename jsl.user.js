@@ -251,6 +251,12 @@
     function addListener(elem, type, fn) {
         var method = core.addEventListener || core.attachEvent;
 
+        handlers.add({
+            'type' : type,
+            'fn' : fn,
+            'element' : elem
+        });
+
         method.call(elem, type, function () {
             return fn.apply(elem, arguments);
         }, false);
@@ -376,7 +382,7 @@
             if ( typeof name === 'string' && this.exists() ) {
                 if (typeof value === 'string') {
                     // handle setting attributes
-                    this.each(function (elem) {
+                    return this.each(function (elem) {
                         core.setAttribute.call(elem, name, value);
                     });
                 }
@@ -384,8 +390,6 @@
                 // handle getting attributes if there was no second argument
                 return core.getAttribute.call(this[0], name);
             }
-
-            return this;
         },
 
         before : function (passedElement) {
@@ -436,7 +440,10 @@
         },
 
         each : function (fn, oThis) {
-            core.forEach.call(this, fn, oThis);
+            core.forEach.call(this, function (value, index, array) {
+                var otherThis = typeof oThis !== 'undefined' ? oThis : value;
+                fn.call(otherThis, value, index, array);
+            }, oThis);
             return this;
         },
 
@@ -523,20 +530,19 @@
             return this.each(changeStyleDisplay, '');
         },
         
-        text : function (passedText, append) {
+        text : function (passedText, addToEnd) {
             // handle setting text
             if (typeof passedText === 'string') {
-                append = append === true;
-                return this.each(function (element) {
-                    if (append) {
-                        core.appendChild.call( element, document.createTextNode(passedText) );
+                return this.each(function (thisElement) {
+                    if (addToEnd === true) {
+                        core.appendChild.call( thisElement, document.createTextNode(passedText) );
                     } else {
-                        walkTheDom(element, function (thisElement) {
-                            if (thisElement.nodeType === 3) {
-                                thisElement.nodeValue = '';
+                        walkTheDom(thisElement, function (thisChildElement) {
+                            if (thisChildElement.nodeType === 3) {
+                                thisChildElement.nodeValue = '';
                             }
                         });
-                        core.appendChild.call( element, document.createTextNode(passedText) );
+                        core.appendChild.call( thisElement, document.createTextNode(passedText) );
                     }
                 });
             }
@@ -574,23 +580,13 @@
     JSL.extend({
         // internal function for adding event listeners
         addEvent : function (element, type, fn) {
-            if (element && typeof type === 'string' && typeof fn === 'function') {
-                if (element.isJSL && typeof element.each === 'function') {
+            if (element != null && typeof type === 'string' && typeof fn === 'function') {
+                if (element.isJSL === true) {
                     element.each(function (elem) {
                         addListener(elem, type, fn);
-                        handlers.add({
-                            'type' : type,
-                            'fn' : fn,
-                            'element' : elem
-                        });
                     });
                 } else {
                     addListener(element, type, fn);
-                    handlers.add({
-                        'type' : type,
-                        'fn' : fn,
-                        'element' : element
-                    });
                 }
             }
 
@@ -642,17 +638,17 @@
         // 1st argument: the tag name of the element you wish to create. OR 'text' and a text node will be created with the 2nd argument's text
         // 2nd argument (optional): an object with attributes to set to the element
         // 3rd argument (optional): an array of children, created with this function, to be added to the element
-        create : function (elemName, attr, kids) {
+        create : function (elementName, descObj, kidsArray) {
             var prop, val, HTMLholder, documentFragment, ret;
 
             // handle text node creation
             // and HTML strings
-            if (elemName === 'text' && typeof attr === 'string') {
-                return document.createTextNode(attr);
-            } else if ( typeof elemName === 'string' && rHTML.test(elemName) ) {
+            if (elementName === 'text' && typeof descObj === 'string') {
+                return document.createTextNode(descObj);
+            } else if ( typeof elementName === 'string' && rHTML.test(elementName) ) {
                 // take the HTML string and put it inside a div
                 HTMLholder = document.createElement('div');
-                HTMLholder.innerHTML = elemName;
+                HTMLholder.innerHTML = elementName;
 
                 // create a document fragment, and add each of the div's children into the document fragment
                 // it would be similar to modifying documentFragment.innerHTML, if it were possible
@@ -664,24 +660,30 @@
                 return documentFragment;
             }
 
-            ret = document.createElement(elemName + '');
+            ret = document.createElement(elementName + '');
 
-            if (typeof attr === 'object') {
-                for (prop in attr) {
-                    val = attr[prop];
-                    if (prop.indexOf('on') === 0 && typeof val === 'function') {
-                        JSL.addEvent(ret, prop.substring(2), val);
-                    } else if ( prop in ret && typeof ret[prop] !== 'undefined' ) {
-                        ret[prop] = val;
-                    } else {
-                        core.setAttribute.call(ret, prop, val);
+            if (typeof descObj === 'object') {
+                for (prop in descObj) {
+                    if ( descObj.hasOwnProperty(prop) ) {
+                        val = descObj[prop];
+                        if (prop.indexOf('on') === 0 && typeof val === 'function') {
+                            JSL.addEvent(ret, prop.substring(2), val);
+                        } else if ( prop in ret && typeof ret[prop] !== 'undefined' ) {
+                            ret[prop] = val;
+                        } else {
+                            core.setAttribute.call(ret, prop, val);
+                        }
                     }
                 }
             }
 
-            if (JSL.typeOf(kids) === 'array') {
-                core.forEach.call(kids, function (kid) {
-                    core.appendChild.call(ret, kid);
+            if (JSL.typeOf(kidsArray) === 'array') {
+                core.forEach.call(kidsArray, function (kid) {
+                    if (typeof kid === 'string') {
+                        core.appendChild.call( ret, JSL.create(kid) );
+                    } else if (typeof kid === 'object') {
+                        core.appendChild.call(ret, kid);
+                    }
                 });
             }
 
@@ -863,6 +865,6 @@
 
     // assign JSL to the window object
     // (and unsafeWindow/unwrapped-window if in a user script)
-    win.JSL = win._J = window.JSL = window._J = JSL;
+    window.JSL = window._J = JSL;
 
 }(window));
