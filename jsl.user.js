@@ -6,7 +6,7 @@
 // @copyright     JoeSimmons
 // @version       1.1.3
 // @license       http://creativecommons.org/licenses/by-nc-nd/3.0/us/
-// @grant         none
+// @grant         GM_info
 // ==/UserScript==
 
 
@@ -147,20 +147,31 @@
 
     // original methods for some common uses
     var core = {
+        // object
+        'hasOwnProperty' : Object.prototype.hasOwnProperty,
+        'toString' : Object.prototype.toString,
+
+        // array
         'slice' : Array.prototype.slice,
         'forEach' : Array.prototype.forEach,
         'map' : Array.prototype.map,
-        'toString' : Object.prototype.toString,
+        'concat' : Array.prototype.concat,
+
+        // element
         'getAttribute' : Element.prototype.getAttribute,
         'setAttribute' : Element.prototype.setAttribute,
         'hasAttribute' : Element.prototype.hasAttribute,
+        'insertBefore' : Element.prototype.insertBefore,
+
+        // node
         'appendChild' : Node.prototype.appendChild,
         'removeChild' : Node.prototype.removeChild,
         'replaceChild' : Node.prototype.replaceChild,
-        'insertBefore' : Element.prototype.insertBefore,
+        'cloneNode' : Node.prototype.cloneNode,
+
+        // eventtarget
         'addEventListener' : EventTarget.prototype.addEventListener,
-        'attachEvent' : EventTarget.prototype.attachEvent,
-        'cloneNode' : Node.prototype.cloneNode
+        'attachEvent' : EventTarget.prototype.attachEvent
     };
 
     var JSL = function (selector, context) {
@@ -301,7 +312,7 @@
             } else if (typeof selector === 'object' && selector != null) {
                 if (selector.isJSL === true) {
                     return selector;
-                } else if ( selector.hasOwnProperty('length') && selector.hasOwnProperty('0') ) {
+                } else if ( core.hasOwnProperty.call(selector, 'length') && core.hasOwnProperty.call(selector, '0') ) {
                     elems = selector;
                 } else {
                     elems = [selector];
@@ -318,6 +329,12 @@
             });
 
             return that;
+        },
+
+        add : function (selector) {
+            var oldElements = this.raw();
+            var newElements = JSL(selector).raw();
+            return JSL( core.concat.call(oldElements, newElements) );
         },
 
         addEvent : function (type, fn) {
@@ -386,7 +403,11 @@
             if ( typeof name === 'string' && this.exists() ) {
                     this.each(function (elem) {
                         if (valueIsString) {
-                            core.setAttribute.call(elem, name, value);
+                            if (name !== 'style' && elem.__lookupSetter__ && typeof elem.__lookupSetter__(name) === 'function') {
+                                elem[name] = value;
+                            } else {
+                                core.setAttribute.call(elem, name, value);
+                            }
                         } else {
                             if (name !== 'style' && elem.__lookupGetter__ && typeof elem.__lookupGetter__(name) === 'function') {
                                 ret += elem[name];
@@ -499,6 +520,16 @@
             return JSL(newElementsArray);
         },
 
+        get : function(index) {
+            index = index === 'first' ? 0 : index === 'last' ? -1 : parseInt(index, 10);
+
+            if ( !isNaN(index) ) {
+                return index < 0 ? this[this.length + index] : this[index];
+            }
+
+            return JSL.toArray(this);
+        },
+
         hide : function () {
             return this.each(changeStyleDisplay, 'none');
         },
@@ -609,7 +640,7 @@
         for (name in obj) {
             copy = obj[name];
 
-            if ( !this.hasOwnProperty(name) && typeof copy !== 'undefined' ) {
+            if ( !core.hasOwnProperty.call(this, name) && typeof copy !== 'undefined' ) {
                 Object.defineProperty(this, name, {
                     value : copy
                 });
@@ -705,7 +736,7 @@
 
             if (typeof descObj === 'object') {
                 for (prop in descObj) {
-                    if ( descObj.hasOwnProperty(prop) ) {
+                    if ( core.hasOwnProperty.call(descObj, prop) ) {
                         val = descObj[prop];
                         if (prop.indexOf('on') === 0 && typeof val === 'function') {
                             JSL.addEvent(ret, prop.substring(2), val);
@@ -909,21 +940,3 @@
     window.JSL = window._J = JSL;
 
 }(window));
-
-// Make sure the page is not in a frame
-if (window.self !== window.top) { return; }
-
-JSL.runAt('end', function () {
-
-    var rUrl = /background:url\(([^\)]+)/;
-
-    JSL('a[href*="image_id="] > div.img-polaroid').each(function () {
-        var _this = JSL(this);
-        var [, thisUrl] = _this.attribute('style').match(rUrl) || [];
-        if (thisUrl) {
-            thisUrl = thisUrl.replace('thumb_', 'display_');
-            _this.parent('a').attribute('href', thisUrl);
-        }
-    });
-
-});
