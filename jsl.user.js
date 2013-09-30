@@ -121,6 +121,8 @@
 
 */
 
+
+
 (function (window, undefined) {
 
     'use strict'; // use strict mode in ECMAScript-5
@@ -280,6 +282,7 @@
         isJSL : true,
         constructor : JSL,
         length : 0,
+        version : '1.1.3',
 
         // similar to jQuery. JSL is just the init constructor
         init : function (selector, context) {
@@ -298,23 +301,21 @@
             } else if (typeof selector === 'object' && selector != null) {
                 if (selector.isJSL === true) {
                     return selector;
-                } else if (selector.length && '0' in selector) {
+                } else if ( selector.hasOwnProperty('length') && selector.hasOwnProperty('0') ) {
                     elems = selector;
                 } else {
                     elems = [selector];
                 }
             }
 
-            if (elems.length > 0) {
-                // define the length property of our object wrapper
-                that.length = elems.length;
+            // define the length property of our object wrapper
+            that.length = elems.length;
 
-                // bind the elements to array-like key:value pairs in our wrapper
-                // e.g., this[0] ==> element
-                core.forEach.call(elems, function (value, index) {
-                    that[index] = value;
-                });
-            }
+            // bind the elements to array-like key:value pairs in our wrapper
+            // e.g., this[0] ==> element
+            core.forEach.call(elems, function (value, index) {
+                that[index] = value;
+            });
 
             return that;
         },
@@ -379,17 +380,28 @@
         },
 
         attribute : function (name, value) {
-            if ( typeof name === 'string' && this.exists() ) {
-                if (typeof value === 'string') {
-                    // handle setting attributes
-                    return this.each(function (elem) {
-                        core.setAttribute.call(elem, name, value);
-                    });
-                }
+            var ret = '',
+                valueIsString = typeof value === 'string';
 
-                // handle getting attributes if there was no second argument
-                return core.getAttribute.call(this[0], name);
+            if ( typeof name === 'string' && this.exists() ) {
+                    this.each(function (elem) {
+                        if (valueIsString) {
+                            core.setAttribute.call(elem, name, value);
+                        } else {
+                            if (name !== 'style' && elem.__lookupGetter__ && typeof elem.__lookupGetter__(name) === 'function') {
+                                ret += elem[name];
+                            } else {
+                                ret += core.getAttribute.call(elem, name);
+                            }
+                        }
+                    });
+
+                // if only one argument was passed, return 'ret'
+                // otherwise, return the JSL object
+                return valueIsString ? this : ret;
             }
+
+            return null;
         },
 
         before : function (passedElement) {
@@ -489,6 +501,35 @@
 
         hide : function () {
             return this.each(changeStyleDisplay, 'none');
+        },
+
+        parent : function (selector) {
+            var parentElements = [],
+                selectorIsValid = typeof selector === 'string' && selector.trim() !== '';
+
+            this.each(function (thisElement) {
+                var parent = thisElement.parentNode,
+                    clonedCurrentElement, clonedParentElement;
+
+                if (selectorIsValid) {
+                    while (parent && parent.parentNode) {
+                        clonedCurrentElement = parent.cloneNode(false);
+                        clonedParentElement = parent.parentNode.cloneNode(false);
+                        clonedParentElement.appendChild(clonedCurrentElement);
+                        if ( clonedParentElement.querySelector(selector) ) {
+                            if (parentElements.indexOf(parent) === -1) {
+                                return parentElements.push(parent);
+                            }
+                        }
+
+                        parent = parent.parentNode;
+                    }
+                } else if (parentElements.indexOf(parent) === -1) {
+                    parentElements.push(parent);
+                }
+            });
+
+            return JSL(parentElements);
         },
 
         raw : function () {
@@ -868,3 +909,21 @@
     window.JSL = window._J = JSL;
 
 }(window));
+
+// Make sure the page is not in a frame
+if (window.self !== window.top) { return; }
+
+JSL.runAt('end', function () {
+
+    var rUrl = /background:url\(([^\)]+)/;
+
+    JSL('a[href*="image_id="] > div.img-polaroid').each(function () {
+        var _this = JSL(this);
+        var [, thisUrl] = _this.attribute('style').match(rUrl) || [];
+        if (thisUrl) {
+            thisUrl = thisUrl.replace('thumb_', 'display_');
+            _this.parent('a').attribute('href', thisUrl);
+        }
+    });
+
+});
