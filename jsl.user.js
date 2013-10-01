@@ -6,7 +6,7 @@
 // @copyright     JoeSimmons
 // @version       1.1.3
 // @license       http://creativecommons.org/licenses/by-nc-nd/3.0/us/
-// @grant         GM_info
+// @grant         none
 // ==/UserScript==
 
 
@@ -31,19 +31,23 @@
 
 /* CHANGELOG
 
-1.1.3 (9/20/2013)
+1.1.3 (10/1/2013)
+    - drastic change. made JSL more similar to jQuery
+        the main methods (JSL.runAt, JSL.addScript, etc) are the same but the
+        DOM methods are different. the elements are in a wrapper now, like JSL('#foo').show()
+        because of the wrapper, JSL.id, JSL.query, & JSL.queryAll are gone
+        read the wiki.
     - added an alias to JSL
         JSL can now also be used (by default) by using _J()
         (underscore and upper-case J)
         e.g., _J('#foo').show()
-    - drastic change. made JSL more similar to jQuery
-        the main methods (JSL.runAt, JSL.addScript, etc) are the same but the
-        DOM methods are different. the elements are in a wrapper now, like JSL('#foo').show()
-        read the wiki.
+    - added JSL.addEvent
+        e.g., JSL.addEvent(elem, 'click', fn);
     - added JSL.loop() ==> will take a function and call it a specified number of times
         e.g., JSL.loop(50, fn);
-    - added ability to pass JSL.create a string of HTML and have it return a tree of elements
-    - modified JSL.xpath to return an array if multiple elements are found
+    - added ability to pass JSL.create a string of HTML and have it return a tree of nodes
+    - JSL.xpath now returns an array instead of an XPath snapshot
+        except in the case that you want a type like singleNodeValue, stringValue, etc
 
 1.1.2 (9/17/2013)
     - updated JSL.create a little
@@ -121,8 +125,6 @@
 
 */
 
-
-
 (function (window, undefined) {
 
     'use strict'; // use strict mode in ECMAScript-5
@@ -145,33 +147,72 @@
     var rHTML = /<[^>]+>/;                                                    // matches HTML strings
     var rHyphenated = /-[a-z]/g;                                              // matches hyphenated strings
 
+    // compatibility methods for browsers that
+    // don't support ECMAScript-5
+    var compat = {
+        'forEach' : function (fn, oThis) {
+            var index, len;
+
+            for (index = 0, len = this.length; index < len && index in this; index += 1) {
+                fn.call(oThis, this[index], index, this);
+            }
+        },
+
+        'map' : function (fn, oThis) {
+            var index, newArr = [], len;
+
+            for (index = 0, len = this.length; index < len && index in this; index += 1) {
+                newArr[index] = fn.call(oThis, this[index], index, this);
+            }
+
+            return newArr;
+        },
+
+        'arr_indexOf' : function (searchElement, fromIndex) {
+            var index = parseInt(fromIndex || 0, 10), len = this.length;
+                index = index < 0 ? len + index : index; // handle negative fromIndex
+                index = !(index > 0) ? 0 : index; // handle out of range and/or NaN fromIndex
+
+            while (index < len && index >= 0) {
+                if (this[index] === searchElement) {
+                    return index;
+                }
+                index += 1;
+            }
+
+            return -1;
+        }
+    };
+
     // original methods for some common uses
     var core = {
+        // array
+        'concat' : Array.prototype.concat,
+        'forEach' : Array.prototype.forEach || compat.forEach,
+        'arr_indexOf' : Array.prototype.indexOf || compat.arr_indexOf,
+        'map' : Array.prototype.map || compat.map,
+        'push' : Array.prototype.push,
+        'slice' : Array.prototype.slice,
+
+        // element
+        'getAttribute' : Element.prototype.getAttribute,
+        'hasAttribute' : Element.prototype.hasAttribute,
+        'insertBefore' : Element.prototype.insertBefore,
+        'setAttribute' : Element.prototype.setAttribute,
+
+        // eventtarget
+        'addEventListener' : EventTarget.prototype.addEventListener,
+        'attachEvent' : EventTarget.prototype.attachEvent,
+
         // object
         'hasOwnProperty' : Object.prototype.hasOwnProperty,
         'toString' : Object.prototype.toString,
 
-        // array
-        'slice' : Array.prototype.slice,
-        'forEach' : Array.prototype.forEach,
-        'map' : Array.prototype.map,
-        'concat' : Array.prototype.concat,
-
-        // element
-        'getAttribute' : Element.prototype.getAttribute,
-        'setAttribute' : Element.prototype.setAttribute,
-        'hasAttribute' : Element.prototype.hasAttribute,
-        'insertBefore' : Element.prototype.insertBefore,
-
         // node
         'appendChild' : Node.prototype.appendChild,
-        'removeChild' : Node.prototype.removeChild,
-        'replaceChild' : Node.prototype.replaceChild,
         'cloneNode' : Node.prototype.cloneNode,
-
-        // eventtarget
-        'addEventListener' : EventTarget.prototype.addEventListener,
-        'attachEvent' : EventTarget.prototype.attachEvent
+        'removeChild' : Node.prototype.removeChild,
+        'replaceChild' : Node.prototype.replaceChild
     };
 
     var JSL = function (selector, context) {
@@ -187,7 +228,7 @@
 
             core.forEach.call(handlers.stack, function (thisEventObj) {
                 if (thisEventObj.element === elem) {
-                    events.push(thisEventObj);
+                    core.push.call(events, thisEventObj);
                 }
             });
 
@@ -195,12 +236,12 @@
         },
 
         'add' : function (thisEventObj) {
-            handlers.stack.push(thisEventObj);
+            core.push.call(handlers.stack, thisEventObj);
         }
     };
 
     // walkTheDom by Douglas Crockford
-    var walkTheDom = function walkTheDom(node, func) {
+    function walkTheDom(node, func) {
         func(node);
         node = node.firstChild;
 
@@ -208,22 +249,34 @@
             walkTheDom(node, func);
             node = node.nextSibling;
         }
-    };
+    }
 
-    function pluck(item) {
-        return item[this];
+    // can pluck a key out of an object
+    function pluck(obj) {
+        var subs = this.split('.'),
+            ret = obj, i;
+
+        for (i = 0; i < subs.length; i += 1) {
+            ret = ret[ subs[i] ];
+            if (ret == null) {
+                return '';
+            }
+        }
+
+        return ret;
     }
 
     // internal function for throwing errors, so the user gets
     // some sort of hint as to why their operation failed
     function error(content) {
-        var errorString = '!! - ' + content + ' - !!';
+        var errorString = '!! - ' + content + ' - !!', method;
 
         if ( content && (typeof content === 'string' || typeof content === 'number') ) {
             if ('Error' in win) {
                 throw new Error(errorString);
             } else if ( 'console' in win && (typeof console.error === 'function' || typeof console.error === 'function') ) {
-                (console.log || console.error)(errorString);
+                method = console.log || console.error;
+                method.call(console, errorString);
             }
         }
     }
@@ -255,11 +308,6 @@
         return passedElement;
     }
 
-    // semi-pure function for changing the display style of an element
-    function changeStyleDisplay(element) {
-        element.style.display = this;
-    }
-
     // function for attaching an event listener
     function addListener(elem, type, fn) {
         var method = core.addEventListener || core.attachEvent;
@@ -281,10 +329,10 @@
     function addNewReturnElements(newElement, arrayToAddTo) {
         if (newElement.nodeType === 11) {
             core.forEach.call(newElement.childNodes, function (thisNewElement) {
-                arrayToAddTo.push(thisNewElement);
+                core.push.call(arrayToAddTo, thisNewElement);
             });
         } else {
-            arrayToAddTo.push(newElement);
+            core.push.call(arrayToAddTo, newElement);
         }
     }
 
@@ -300,19 +348,33 @@
             var that = this, elems = [];
 
             if (typeof selector === 'string') {
-                if ( rSelector.test(selector) ) {
-                    context = context != null && context.querySelectorAll ? context : document;
-                    elems = context.querySelectorAll(selector);
-                } else if ( rXpath.test(selector) ) {
+                if ( rXpath.test(selector) ) {
                     elems = JSL.xpath({expression : selector, type : 7, context : context});
                 } else if ( rHTML.test(selector) ) {
                     // reserved for html code creation
                     // not sure if I want to implement it
+                } else if ( rSelector.test(selector) ) {
+                    if (JSL.typeOf(context) === 'array') {
+                        // handle an array being passed as the context
+                        core.forEach.call(context, function (thisElement) {
+                            var docFrag = document.createDocumentFragment(),
+                                thisElementClone = core.cloneNode.call(thisElement, false);
+                                docFrag.appendChild(thisElementClone);
+
+                            if (docFrag.querySelectorAll(selector).length > 0) {
+                                core.push.call(elems, thisElement);
+                            }
+                        });
+                    } else {
+                        // handle a regular element being passed as the context
+                        context = context != null && context.querySelectorAll ? context : document;
+                        elems = context.querySelectorAll(selector);
+                    }
                 }
             } else if (typeof selector === 'object' && selector != null) {
                 if (selector.isJSL === true) {
                     return selector;
-                } else if ( core.hasOwnProperty.call(selector, 'length') && core.hasOwnProperty.call(selector, '0') ) {
+                } else if ( core.hasOwnProperty.call(selector, 'length') ) {
                     elems = selector;
                 } else {
                     elems = [selector];
@@ -464,10 +526,7 @@
                         }
                     });
                 } else {
-                    return core.map.call(this, function (thisElement) {
-                        var thisStyle = thisElement.style[name]
-                        return typeof thisStyle !== 'undefined' ? thisStyle : '';
-                    }).join('');
+                    return core.map.call(this, pluck, 'style.' + name).join('');
                 }
             }
         },
@@ -485,13 +544,24 @@
         },
 
         filter : function (selector) {
-            // add the current elements to a document fragment
-            var documentFragment = document.createDocumentFragment();
-            this.each(function (thisElement) {
-                documentFragment.appendChild( cloneElement(thisElement) );
-            });
+            return typeof selector === 'string' ? JSL( selector, this.raw() ) : null;
+        },
 
-            return JSL(selector, documentFragment);
+        find : function (selector) {
+            var newElementsArray = [];
+
+            if (typeof selector === 'string') {
+                this.each(function (thisElement) {
+                    var newElements = thisElement.querySelectorAll ? thisElement.querySelectorAll(selector) : [];
+                    if (newElements.length > 0) {
+                        newElementsArray.push.apply(newElementsArray, newElements);
+                    }
+                });
+
+                return JSL(newElementsArray);
+            }
+            
+            return null;
         },
 
         first : function (passedElement) {
@@ -501,9 +571,9 @@
 
             // filter null/undefined values
             if (passedElement != null) {
-                this.each(function (element) {
+                this.each(function (thisElement) {
                     var newElement = cloneElement(passedElement),
-                        firstChild = element.firstChild;
+                        firstChild = thisElement.firstChild;
 
                     if (firstChild) {
                         // add the new elements to the new elements array
@@ -512,7 +582,7 @@
                         addNewReturnElements(newElement, newElementsArray);
 
                         // add the newElement before the current element's first child
-                        core.insertBefore.call(element, newElement, firstChild);
+                        core.insertBefore.call(thisElement, newElement, firstChild);
                     }
                 });
             }
@@ -520,7 +590,7 @@
             return JSL(newElementsArray);
         },
 
-        get : function(index) {
+        get : function (index) {
             index = index === 'first' ? 0 : index === 'last' ? -1 : parseInt(index, 10);
 
             if ( !isNaN(index) ) {
@@ -531,7 +601,13 @@
         },
 
         hide : function () {
-            return this.each(changeStyleDisplay, 'none');
+            return this.each(function (thisElement) {
+                thisElement.style.display = 'none';
+            });
+        },
+
+        is : function (selector) {
+            return this.filter(selector).exists();
         },
 
         parent : function (selector) {
@@ -544,19 +620,19 @@
 
                 if (selectorIsValid) {
                     while (parent && parent.parentNode) {
-                        clonedCurrentElement = parent.cloneNode(false);
-                        clonedParentElement = parent.parentNode.cloneNode(false);
-                        clonedParentElement.appendChild(clonedCurrentElement);
+                        clonedCurrentElement = core.cloneNode.call(parent, false);
+                        clonedParentElement = core.cloneNode.call(parent.parentNode, false);
+                        core.appendChild.call(clonedParentElement, clonedCurrentElement);
                         if ( clonedParentElement.querySelector(selector) ) {
-                            if (parentElements.indexOf(parent) === -1) {
-                                return parentElements.push(parent);
+                            if (core.arr_indexOf.call(parentElements, parent) === -1) {
+                                return core.push.call(parentElements, parent);
                             }
                         }
 
                         parent = parent.parentNode;
                     }
-                } else if (parentElements.indexOf(parent) === -1) {
-                    parentElements.push(parent);
+                } else if (core.arr_indexOf.call(parentElements, parent) === -1) {
+                    core.push.call(parentElements, parent);
                 }
             });
 
@@ -598,8 +674,12 @@
             return JSL(newElementsArray);
         },
 
-        show : function () {
-            return this.each(changeStyleDisplay, '');
+        show : function (value) {
+            value = typeof value === 'string' ? value : '';
+
+            return this.each(function (thisElement) {
+                thisElement.style.display = value;
+            });
         },
         
         text : function (passedText, addToEnd) {
@@ -624,8 +704,8 @@
         },
 
         toggle : function () {
-            return this.each(function (element) {
-                element.style.display = element.style.display === 'none' ? '' : 'none';
+            return this.each(function (thisElement) {
+                thisElement.style.display = thisElement.style.display === 'none' ? '' : 'none';
             });
         }
     };
@@ -641,9 +721,7 @@
             copy = obj[name];
 
             if ( !core.hasOwnProperty.call(this, name) && typeof copy !== 'undefined' ) {
-                Object.defineProperty(this, name, {
-                    value : copy
-                });
+                this[name] = copy;
             }
         }
     };
@@ -726,7 +804,7 @@
                 // it would be similar to modifying documentFragment.innerHTML, if it were possible
                 documentFragment = document.createDocumentFragment();
                 core.forEach.call(HTMLholder.childNodes, function (child) {
-                    documentFragment.appendChild( child.cloneNode(true) );
+                    documentFragment.appendChild( core.cloneNode.call(child, true) );
                 });
 
                 return documentFragment;
@@ -868,7 +946,7 @@
             if (typeof len === 'number' && len > 0) {
                 if (typeof arr.snapshotItem === 'function') {
                     for (i = 0; ( item = arr.snapshotItem(i) ); i += 1) {
-                        newArr.push(item);
+                        core.push.call(newArr, item);
                     }
                 } else if ('0' in arr) {
                     // if the specified 'list' is array-like, use slice on it
@@ -936,7 +1014,6 @@
     });
 
     // assign JSL to the window object
-    // (and unsafeWindow/unwrapped-window if in a user script)
     window.JSL = window._J = JSL;
 
 }(window));
