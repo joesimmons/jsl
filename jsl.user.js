@@ -1007,7 +1007,7 @@
             if (typeof len === 'number' && len > 0) {
                 if (typeof arr.snapshotItem === 'function') {
                     for (i = 0; ( item = arr.snapshotItem(i) ); i += 1) {
-                        newArr(item);
+                        newArr.push(item);
                     }
                 } else {
                     // if the specified 'list' is array-like, use slice on it
