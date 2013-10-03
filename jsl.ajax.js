@@ -3,12 +3,16 @@
 // @namespace   http://userscripts.org/users/23652
 // @description An AJAX extension for JSL
 // @include     *
-// @version     1.0.0
+// @version     1.0.1
 // @require     https://raw.github.com/joesimmons/jsl/master/jsl.user.js
 // @grant       none
 // ==/UserScript==
 
 /* CHANGELOG
+
+1.0.1 (10/3/2013)
+    - fixed small bug with passing a url array
+    - fixed bug not allowing HEAD requests to be recognized
 
 1.0.0 (10/1/2013)
     - created
@@ -173,7 +177,7 @@
         if (typeof url === 'string') {
             urls.push(url);
         } else if (JSL.typeOf(url) === 'array') {
-            urls.concat(url);
+            urls = urls.concat(url);
         }
 
         if (JSL.typeOf(settings) === 'object') {
@@ -202,7 +206,7 @@
                         break;
                     }
                     case 'method': {
-                        if ( typeof value === 'string' && /get|post/i.test(value) ) {
+                        if ( typeof value === 'string' && /get|post|head/i.test(value) ) {
                             realSettings[key] = value.toUpperCase();
                         }
                         break;
