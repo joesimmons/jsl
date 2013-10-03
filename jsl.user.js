@@ -4,7 +4,7 @@
 // @description   A JavaScript library used by JoeSimmons
 // @include       *
 // @copyright     JoeSimmons
-// @version       1.1.3
+// @version       1.1.4
 // @license       http://creativecommons.org/licenses/by-nc-nd/3.0/us/
 // @grant         none
 // ==/UserScript==
@@ -31,12 +31,27 @@
 
 /* CHANGELOG
 
+1.1.4 (10/2/2013)
+    - made JSL compatible for browsers without ECMAScript-5 (requires ECMAScript-3 at least)
+    - added JSL.each()
+    - changed .first() to .prepend()
+    - added .first(), .height(), .last(), .prev(), .next(), .width()
+        check the wiki for explanations
+    - modified .get()
+        will take an integer (positive or negative) and return a new JSL object with that single element
+    - simplified several methods to shorten code and improve readability
+    - changed the init so that if you pass an array of elements as the context,
+        it will do a deep search of their children, but not the elements themselves
+        e.g., JSL( '#foo', [bar, baz] ) is the same as JSL( [bar, baz] ).find('#foo')
+        it will not match bar or baz, but it can match any of their children
+
 1.1.3 (10/1/2013)
     - drastic change. made JSL more similar to jQuery
         the main methods (JSL.runAt, JSL.addScript, etc) are the same but the
         DOM methods are different. the elements are in a wrapper now, like JSL('#foo').show()
         because of the wrapper, JSL.id, JSL.query, & JSL.queryAll are gone
         read the wiki.
+    - added add()
     - added an alias to JSL
         JSL can now also be used (by default) by using _J()
         (underscore and upper-case J)
@@ -129,27 +144,46 @@
 
     'use strict'; // use strict mode in ECMAScript-5
 
-    // get an unwrapped window object. sometimes necessary for user scripts
-    var win = function (elem) {
-        if (typeof XPCNativeWrapper === 'function' && typeof XPCNativeWrapper.unwrap === 'function') {
-            return XPCNativeWrapper.unwrap(elem);
-        } else if (elem.wrappedJSObject) {
-            return elem.wrappedJSObject;
-        }
-        return elem;
-    }(window);
-
-    var intervals = []; // initialize an array for the [set/clear]Interval methods
+    // initialize an array for the [set/clear]Interval methods
+    var intervals = [];
 
     // regular expressions
-    var rSelector = /^\*$|^\.[a-zA-Z][a-zA-Z0-9-_]*|^#[^ ]+|^[a-zA-Z]+/;      // matches a CSS selector
-    var rXpath = /^\.?\/{1,2}[a-zA-Z\*]+/;                                    // matches an XPath selector
-    var rHTML = /<[^>]+>/;                                                    // matches HTML strings
-    var rHyphenated = /-[a-z]/g;                                              // matches hyphenated strings
+    var rSelector = /^\*|^\.[a-z][\w\d-]*|^#[^ ]+|^[a-z]+|^\[a-z]+/i;   // matches a CSS selector
+    var rXpath = /^\.?\/{1,2}[a-zA-Z\*]+/;                              // matches an XPath selector
+    var rHTML = /<[^>]+>/;                                              // matches HTML strings
+    var rHyphenated = /-[a-z]/g;                                        // matches hyphenated strings
 
     // compatibility methods for browsers that
     // don't support ECMAScript-5
     var compat = {
+        'arr_indexOf' : function (searchElement, fromIndex) {
+            var index = parseInt(fromIndex || 0, 10), len = this.length;
+                index = index < 0 ? len + index : index; // handle negative fromIndex
+                index = !(index > 0) ? 0 : index; // handle out of range and/or NaN fromIndex
+
+            while (index < len && index >= 0) {
+                if (this[index] === searchElement) {
+                    return index;
+                }
+                index += 1;
+            }
+
+            return -1;
+        },
+
+        'filter' : function (fn, oThis) {
+            var index, value, len = this.length, ret = [];
+
+            for (index = 0; index < len; index += 1) {
+                value = this[index];
+                if ( fn.call(oThis, value, index, this) ) {
+                    ret.push(value);
+                }
+            }
+
+            return ret;
+        },
+
         'forEach' : function (fn, oThis) {
             var index, len;
 
@@ -168,51 +202,56 @@
             return newArr;
         },
 
-        'arr_indexOf' : function (searchElement, fromIndex) {
-            var index = parseInt(fromIndex || 0, 10), len = this.length;
-                index = index < 0 ? len + index : index; // handle negative fromIndex
-                index = !(index > 0) ? 0 : index; // handle out of range and/or NaN fromIndex
+        'reduce' : function (fn, initialValue) {
+            var index, len, value, isValueSet = false;
 
-            while (index < len && index >= 0) {
-                if (this[index] === searchElement) {
-                    return index;
-                }
-                index += 1;
+            if (arguments.length > 1) {
+                value = initialValue;
+                isValueSet = true;
             }
 
-            return -1;
+            for (index = 0, len = this.length; index < len; index += 1) {
+                if (isValueSet) {
+                    value = fn(value, this[index], index, this);
+                } else {
+                    value = this[index];
+                    isValueSet = true;
+                }
+            }
+
+            return value;
+        }
+    };
+
+    // gets a method from an object's prototype. returns undefined if it fails
+    var getMethod = function (obj, method) {
+        var uObj = obj;
+
+        if (typeof XPCNativeWrapper === 'function' && typeof XPCNativeWrapper.unwrap === 'function') {
+            uObj = XPCNativeWrapper.unwrap(obj);
+        } else if (obj.wrappedJSObject) {
+            uObj = obj.wrappedJSObject;
+        }
+
+        if (uObj.prototype && typeof uObj.prototype[method] === 'function') {
+            return uObj.prototype[method];
         }
     };
 
     // original methods for some common uses
     var core = {
         // array
-        'concat' : Array.prototype.concat,
-        'forEach' : Array.prototype.forEach || compat.forEach,
-        'arr_indexOf' : Array.prototype.indexOf || compat.arr_indexOf,
-        'map' : Array.prototype.map || compat.map,
-        'push' : Array.prototype.push,
-        'slice' : Array.prototype.slice,
-
-        // element
-        'getAttribute' : Element.prototype.getAttribute,
-        'hasAttribute' : Element.prototype.hasAttribute,
-        'insertBefore' : Element.prototype.insertBefore,
-        'setAttribute' : Element.prototype.setAttribute,
-
-        // eventtarget
-        'addEventListener' : EventTarget.prototype.addEventListener,
-        'attachEvent' : EventTarget.prototype.attachEvent,
+        'concat' : getMethod(Array, 'concat'),
+        'filter' : getMethod(Array, 'filter') || compat.filter,
+        'forEach' : getMethod(Array, 'forEach') || compat.forEach,
+        'arr_indexOf' : getMethod(Array, 'indexOf') || compat.arr_indexOf,
+        'map' : getMethod(Array, 'map') || compat.map,
+        'reduce' : getMethod(Array, 'reduce') || compat.reduce,
+        'slice' : getMethod(Array, 'slice'),
 
         // object
-        'hasOwnProperty' : Object.prototype.hasOwnProperty,
-        'toString' : Object.prototype.toString,
-
-        // node
-        'appendChild' : Node.prototype.appendChild,
-        'cloneNode' : Node.prototype.cloneNode,
-        'removeChild' : Node.prototype.removeChild,
-        'replaceChild' : Node.prototype.replaceChild
+        'hasOwnProperty' : getMethod(Object, 'hasOwnProperty'),
+        'toString' : getMethod(Object, 'toString'),
     };
 
     var JSL = function (selector, context) {
@@ -228,7 +267,7 @@
 
             core.forEach.call(handlers.stack, function (thisEventObj) {
                 if (thisEventObj.element === elem) {
-                    core.push.call(events, thisEventObj);
+                    events.push(thisEventObj);
                 }
             });
 
@@ -236,7 +275,7 @@
         },
 
         'add' : function (thisEventObj) {
-            core.push.call(handlers.stack, thisEventObj);
+            handlers.stack.push(thisEventObj);
         }
     };
 
@@ -266,15 +305,19 @@
         return ret;
     }
 
+    function sumInt(a, b) {
+        return parseInt(a, 10) + parseInt(b, 10);
+    }
+
     // internal function for throwing errors, so the user gets
     // some sort of hint as to why their operation failed
     function error(content) {
         var errorString = '!! - ' + content + ' - !!', method;
 
         if ( content && (typeof content === 'string' || typeof content === 'number') ) {
-            if ('Error' in win) {
+            if ('Error' in window) {
                 throw new Error(errorString);
-            } else if ( 'console' in win && (typeof console.error === 'function' || typeof console.error === 'function') ) {
+            } else if ( 'console' in window && (typeof console.error === 'function' || typeof console.error === 'function') ) {
                 method = console.log || console.error;
                 method.call(console, errorString);
             }
@@ -284,7 +327,7 @@
     // will copy an element and return a new copy with
     // the same event listeners
     function cloneElement(element) {
-        var newElement = core.cloneNode.call(element, true);
+        var newElement = element.cloneNode(true);
 
         // clone event listeners of element
         core.forEach.call(handlers.get(element), function (thisEventObj) {
@@ -310,17 +353,23 @@
 
     // function for attaching an event listener
     function addListener(elem, type, fn) {
-        var method = core.addEventListener || core.attachEvent;
+        function callFn() {
+            return fn.apply(elem, arguments);
+        }
+
+        if (typeof elem.addEventListener === 'function') {
+            elem.addEventListener(type, callFn, false);
+        } else if (typeof elem.attachEvent === 'function') {
+            elem.attachEvent(type, callFn, false);
+        } else {
+            return;
+        }
 
         handlers.add({
             'type' : type,
             'fn' : fn,
             'element' : elem
         });
-
-        method.call(elem, type, function () {
-            return fn.apply(elem, arguments);
-        }, false);
     }
 
     // this will add all the childNodes of the
@@ -328,12 +377,30 @@
     // if not a document fragment, it will just add that element to 'arrayToAddTo'
     function addNewReturnElements(newElement, arrayToAddTo) {
         if (newElement.nodeType === 11) {
-            core.forEach.call(newElement.childNodes, function (thisNewElement) {
-                core.push.call(arrayToAddTo, thisNewElement);
+            JSL.each(newElement.childNodes, function (thisNewElement) {
+                arrayToAddTo.push(thisNewElement);
             });
         } else {
-            core.push.call(arrayToAddTo, newElement);
+            arrayToAddTo.push(newElement);
         }
+    }
+
+    function getEachElements(array, selector, key, type) {
+        var newElementsArray = [],
+            isValidSelector = typeof selector === 'string' && selector.trim() !== '';
+
+        JSL.each(array, function (currentElement) {
+            while ( currentElement = currentElement[key] ) { // note: intentional assignment
+                if (type > 0 ? currentElement.nodeType === type : true) {
+                    if ( isValidSelector === false || JSL(currentElement).filter(selector).exists() ) {
+                        newElementsArray.push(currentElement);
+                        return;
+                    }
+                }
+            }
+        });
+
+        return newElementsArray;
     }
 
     // define JSL's prototype, aka JSL.fn
@@ -341,7 +408,7 @@
         isJSL : true,
         constructor : JSL,
         length : 0,
-        version : '1.1.3',
+        version : '1.1.4',
 
         // similar to jQuery. JSL is just the init constructor
         init : function (selector, context) {
@@ -356,15 +423,7 @@
                 } else if ( rSelector.test(selector) ) {
                     if (JSL.typeOf(context) === 'array') {
                         // handle an array being passed as the context
-                        core.forEach.call(context, function (thisElement) {
-                            var docFrag = document.createDocumentFragment(),
-                                thisElementClone = core.cloneNode.call(thisElement, false);
-                                docFrag.appendChild(thisElementClone);
-
-                            if (docFrag.querySelectorAll(selector).length > 0) {
-                                core.push.call(elems, thisElement);
-                            }
-                        });
+                        return that.find.call(context, selector);
                     } else {
                         // handle a regular element being passed as the context
                         context = context != null && context.querySelectorAll ? context : document;
@@ -386,7 +445,7 @@
 
             // bind the elements to array-like key:value pairs in our wrapper
             // e.g., this[0] ==> element
-            core.forEach.call(elems, function (value, index) {
+            JSL.each(elems, function (value, index) {
                 that[index] = value;
             });
 
@@ -394,9 +453,9 @@
         },
 
         add : function (selector) {
-            var oldElements = this.raw();
-            var newElements = JSL(selector).raw();
-            return JSL( core.concat.call(oldElements, newElements) );
+            var newElements = JSL(selector).raw(),
+                allElements = this.raw().concat(newElements);
+            return JSL(allElements);
         },
 
         addEvent : function (type, fn) {
@@ -406,8 +465,7 @@
 
         after : function (passedElement) {
             var newElementsArray = [];
-
-            passedElement = handleHTMLcreation(passedElement);
+                passedElement = handleHTMLcreation(passedElement);
 
             // filter null/undefined values
             if (passedElement != null) {
@@ -424,10 +482,10 @@
 
                         if (next) {
                             // add the newElement after the current element
-                            core.insertBefore.call(parent, newElement, next);
+                            parent.insertBefore(newElement, next);
                         } else {
                             // nextSibling didn't exist. just append to its parent
-                            core.appendChild.call(parent, newElement);
+                            parent.appendChild(newElement);
                         }
                     }
                 });
@@ -438,12 +496,11 @@
 
         append : function (passedElement) {
             var newElementsArray = [];
-
-            passedElement = handleHTMLcreation(passedElement);
+                passedElement = handleHTMLcreation(passedElement);
 
             // filter null/undefined values
             if (passedElement != null) {
-                this.each(function (element) {
+                this.each(function (thisElement) {
                     var newElement = cloneElement(passedElement);
 
                     // add the new elements to the new elements array
@@ -451,7 +508,7 @@
                     // containing the new elements, not the old ones
                     addNewReturnElements(newElement, newElementsArray);
 
-                    core.appendChild.call(element, newElement);
+                    thisElement.appendChild(newElement);
                 });
             }
 
@@ -459,23 +516,14 @@
         },
 
         attribute : function (name, value) {
-            var ret = '',
-                valueIsString = typeof value === 'string';
+            var ret = '', valueIsString = typeof value === 'string';
 
             if ( typeof name === 'string' && this.exists() ) {
                     this.each(function (elem) {
                         if (valueIsString) {
-                            if (name !== 'style' && elem.__lookupSetter__ && typeof elem.__lookupSetter__(name) === 'function') {
-                                elem[name] = value;
-                            } else {
-                                core.setAttribute.call(elem, name, value);
-                            }
+                            elem.setAttribute(name, value);
                         } else {
-                            if (name !== 'style' && elem.__lookupGetter__ && typeof elem.__lookupGetter__(name) === 'function') {
-                                ret += elem[name];
-                            } else {
-                                ret += core.getAttribute.call(elem, name);
-                            }
+                            ret += elem.getAttribute(name);
                         }
                     });
 
@@ -484,13 +532,14 @@
                 return valueIsString ? this : ret;
             }
 
-            return null;
+            // if no valid name was passed, return JSL object
+            // otherwise, if JSL object empty or name isn't a string, return null
+            return valueIsString ? this : null;
         },
 
         before : function (passedElement) {
             var newElementsArray = [];
-
-            passedElement = handleHTMLcreation(passedElement);
+                passedElement = handleHTMLcreation(passedElement);
 
             // filter null/undefined values
             if (passedElement != null) {
@@ -505,7 +554,7 @@
                         addNewReturnElements(newElement, newElementsArray);
 
                         // add the newElement before the current element
-                        core.insertBefore.call(parent, newElement, element);
+                        parent.insertBefore(newElement, element);
                     }
                 });
             }
@@ -529,13 +578,13 @@
                     return core.map.call(this, pluck, 'style.' + name).join('');
                 }
             }
+
+            // return JSL object if name isn't a string
+            return this;
         },
 
         each : function (fn, oThis) {
-            core.forEach.call(this, function (value, index, array) {
-                var otherThis = typeof oThis !== 'undefined' ? oThis : value;
-                fn.call(otherThis, value, index, array);
-            }, oThis);
+            JSL.each(this, fn, oThis);
             return this;
         },
 
@@ -544,30 +593,79 @@
         },
 
         filter : function (selector) {
-            return typeof selector === 'string' ? JSL( selector, this.raw() ) : null;
-        },
-
-        find : function (selector) {
             var newElementsArray = [];
 
-            if (typeof selector === 'string') {
-                this.each(function (thisElement) {
-                    var newElements = thisElement.querySelectorAll ? thisElement.querySelectorAll(selector) : [];
-                    if (newElements.length > 0) {
-                        newElementsArray.push.apply(newElementsArray, newElements);
+            if ( typeof selector === 'string' && rSelector.test(selector) ) {
+                JSL.each(this, function (thisElement) {
+                    var docFrag = document.createDocumentFragment(),
+                        thisElementClone = thisElement.cloneNode(false); // non-deep search
+                        docFrag.appendChild(thisElementClone);
+
+                    if ( docFrag.querySelector(selector) ) {
+                        newElementsArray.push(thisElement);
                     }
                 });
 
                 return JSL(newElementsArray);
             }
-            
+
             return null;
         },
 
-        first : function (passedElement) {
-            var newElementsArray = [];
+        find : function (selector) {
+            var arrayOfMatchesArrays = core.map.call(this, function (thisElement) {
+                var matches = thisElement.querySelectorAll(selector);
+                return JSL.toArray(matches);
+            });
+            var singleArrayOfMatches = arrayOfMatchesArrays.length > 0 ? core.reduce.call(arrayOfMatchesArrays, function (a, b) {
+                return a.concat(b);
+            }) : [];
 
-            passedElement = handleHTMLcreation(passedElement);
+            return JSL(singleArrayOfMatches);
+        },
+
+        first : function () {
+            return this.get(0);
+        },
+
+        get : function (index) {
+            index = index === 'first' ? 0 : index === 'last' ? -1 : parseInt(index, 10);
+
+            if ( !isNaN(index) ) {
+                return JSL( index < 0 ? this[this.length + index] : this[index] );
+            }
+
+            return JSL.toArray(this);
+        },
+
+        height : function () {
+            var arrayOfElemHeights = core.map.call(this, pluck, 'offsetHeight');
+            return core.reduce.call(arrayOfElemHeights, sumInt);
+        },
+
+        hide : function () {
+            return this.css('display', 'none');
+        },
+
+        is : function (selector) {
+            return this.filter(selector).exists();
+        },
+
+        last : function (selector) {
+            return this.get(-1);
+        },
+
+        next : function (selector) {
+            return JSL( getEachElements(this, selector, 'nextSibling', 1) );
+        },
+
+        parent : function (selector) {
+            return JSL( getEachElements(this, selector, 'parentNode', 1) );
+        },
+
+        prepend : function (passedElement) {
+            var newElementsArray = [];
+                passedElement = handleHTMLcreation(passedElement);
 
             // filter null/undefined values
             if (passedElement != null) {
@@ -582,7 +680,7 @@
                         addNewReturnElements(newElement, newElementsArray);
 
                         // add the newElement before the current element's first child
-                        core.insertBefore.call(thisElement, newElement, firstChild);
+                        thisElement.insertBefore(newElement, firstChild);
                     }
                 });
             }
@@ -590,72 +688,26 @@
             return JSL(newElementsArray);
         },
 
-        get : function (index) {
-            index = index === 'first' ? 0 : index === 'last' ? -1 : parseInt(index, 10);
-
-            if ( !isNaN(index) ) {
-                return index < 0 ? this[this.length + index] : this[index];
-            }
-
-            return JSL.toArray(this);
-        },
-
-        hide : function () {
-            return this.each(function (thisElement) {
-                thisElement.style.display = 'none';
-            });
-        },
-
-        is : function (selector) {
-            return this.filter(selector).exists();
-        },
-
-        parent : function (selector) {
-            var parentElements = [],
-                selectorIsValid = typeof selector === 'string' && selector.trim() !== '';
-
-            this.each(function (thisElement) {
-                var parent = thisElement.parentNode,
-                    clonedCurrentElement, clonedParentElement;
-
-                if (selectorIsValid) {
-                    while (parent && parent.parentNode) {
-                        clonedCurrentElement = core.cloneNode.call(parent, false);
-                        clonedParentElement = core.cloneNode.call(parent.parentNode, false);
-                        core.appendChild.call(clonedParentElement, clonedCurrentElement);
-                        if ( clonedParentElement.querySelector(selector) ) {
-                            if (core.arr_indexOf.call(parentElements, parent) === -1) {
-                                return core.push.call(parentElements, parent);
-                            }
-                        }
-
-                        parent = parent.parentNode;
-                    }
-                } else if (core.arr_indexOf.call(parentElements, parent) === -1) {
-                    core.push.call(parentElements, parent);
-                }
-            });
-
-            return JSL(parentElements);
+        prev : function (selector) {
+            return JSL( getEachElements(this, selector, 'previousSibling', 1) );
         },
 
         raw : function () {
-            return core.slice.call(this, 0);
+            return [].slice.call(this, 0);
         },
 
         remove : function () {
             return this.each(function (element) {
                 var parent = element.parentNode;
                 if (element && parent) {
-                    core.removeChild.call(parent, element);
+                    parent.removeChild(element);
                 }
             });
         },
 
         replace : function (passedElement) {
             var newElementsArray = [];
-
-            passedElement = handleHTMLcreation(passedElement);
+                passedElement = handleHTMLcreation(passedElement);
 
             this.each(function (element, index) {
                 var newElement = cloneElement(passedElement),
@@ -667,7 +719,7 @@
                     // containing the new elements, not the old ones
                     addNewReturnElements(newElement, newElementsArray);
 
-                    core.replaceChild.call(parent, newElement, element);
+                    parent.replaceChild(newElement, element);
                 }
             }, this);
 
@@ -675,28 +727,26 @@
         },
 
         show : function (value) {
-            value = typeof value === 'string' ? value : '';
-
-            return this.each(function (thisElement) {
-                thisElement.style.display = value;
-            });
+            value = typeof value === 'string' && value !== '' ? value : 'inline';
+            return this.css('display', value);
         },
         
-        text : function (passedText, addToEnd) {
+        text : function (passedText, append) {
             // handle setting text
             if (typeof passedText === 'string') {
-                return this.each(function (thisElement) {
-                    if (addToEnd === true) {
-                        core.appendChild.call( thisElement, document.createTextNode(passedText) );
-                    } else {
+                if (append !== true) {
+                    this.each(function (thisElement) {
                         walkTheDom(thisElement, function (thisChildElement) {
                             if (thisChildElement.nodeType === 3) {
                                 thisChildElement.nodeValue = '';
                             }
                         });
-                        core.appendChild.call( thisElement, document.createTextNode(passedText) );
-                    }
-                });
+                    });
+                }
+
+                this.append( JSL.create('text', passedText) );
+
+                return this;
             }
 
             // handle getting text
@@ -705,9 +755,13 @@
 
         toggle : function () {
             return this.each(function (thisElement) {
-                thisElement.style.display = thisElement.style.display === 'none' ? '' : 'none';
+                thisElement.style.display === 'none' ? JSL(this).show() : JSL(this).hide();
             });
-        }
+        },
+
+        width : function () {
+            return core.reduce.call( core.map.call(this, pluck, 'offsetWidth'), sumInt);
+        },
     };
 
     // give the init function the JSL prototype for later instantiation
@@ -757,7 +811,7 @@
 
             return {
                 remove : function () {
-                    core.removeChild.call(node, newElement);
+                    node.removeChild(newElement);
                 }
             };
         },
@@ -803,8 +857,8 @@
                 // create a document fragment, and add each of the div's children into the document fragment
                 // it would be similar to modifying documentFragment.innerHTML, if it were possible
                 documentFragment = document.createDocumentFragment();
-                core.forEach.call(HTMLholder.childNodes, function (child) {
-                    documentFragment.appendChild( core.cloneNode.call(child, true) );
+                JSL.each(HTMLholder.childNodes, function (child) {
+                    documentFragment.appendChild( child.cloneNode(true) );
                 });
 
                 return documentFragment;
@@ -821,7 +875,7 @@
                         } else if ( prop in ret && typeof ret[prop] !== 'undefined' ) {
                             ret[prop] = val;
                         } else {
-                            core.setAttribute.call(ret, prop, val);
+                            ret.setAttribute(prop, val);
                         }
                     }
                 }
@@ -830,9 +884,9 @@
             if (JSL.typeOf(kidsArray) === 'array') {
                 core.forEach.call(kidsArray, function (kid) {
                     if (typeof kid === 'string') {
-                        core.appendChild.call( ret, JSL.create(kid) );
+                        ret.appendChild( JSL.create(kid) );
                     } else if (typeof kid === 'object') {
-                        core.appendChild.call(ret, kid);
+                        ret.appendChild(kid);
                     }
                 });
             }
@@ -840,11 +894,18 @@
             return ret;
         },
 
+        each : function (passedArray, fn, oThis) {
+            core.forEach.call(passedArray, function (value, index, array) {
+                var otherThis = typeof oThis !== 'undefined' ? oThis : value;
+                fn.call(otherThis, value, index, array);
+            }, oThis);
+        },
+
         loop : function (maxIterations, fn) {
             var args = JSL.toArray(arguments), i;
 
             if (maxIterations > 0 && fn) {
-                args = core.slice.call(args, 2);
+                args = [].slice.call(args, 2);
                 for (i = 0; i < maxIterations; i += 1) {
                     fn.apply(null, args);
                 }
@@ -866,7 +927,7 @@
         // run a function at a specified document readyState
         // syntax: JSL.runAt( 'complete', someFunc [, thisValue] [, ...otherArguments] );
         runAt : function (state, func, oThis) {
-            var args = JSL.toArray(arguments),
+            var args = JSL.toArray(arguments), intv,
 
                 // compose a list of the 4 states, to use .indexOf() upon later
                 states = ['uninitialized', 'loading', 'interactive', 'complete'],
@@ -885,16 +946,16 @@
             function checkState() {
                 if (document.readyState === state) {
                     runFunc();
-                    document.removeEventListener('readystatechange', checkState, false);
+                    JSL.clearInterval(intv);
                 }
             }
 
-            if ( states.indexOf(state) <= states.indexOf(document.readyState) ) {
+            if ( core.arr_indexOf.call(states, state) <= core.arr_indexOf.call(states, document.readyState) ) {
                 // we are at, or have missed, our desired state
                 // run the specified function
                 runFunc();
             } else {
-                document.addEventListener('readystatechange', checkState, false);
+                intv = JSL.setInterval(checkState, 200);
             }
         },
 
@@ -946,18 +1007,18 @@
             if (typeof len === 'number' && len > 0) {
                 if (typeof arr.snapshotItem === 'function') {
                     for (i = 0; ( item = arr.snapshotItem(i) ); i += 1) {
-                        core.push.call(newArr, item);
+                        newArr(item);
                     }
-                } else if ('0' in arr) {
+                } else {
                     // if the specified 'list' is array-like, use slice on it
                     // to convert it to an array
-                    newArr = core.slice.call(arr, 0);
+                    newArr = [].slice.call(arr, 0);
                 }
 
                 return newArr;
             }
 
-            return arr || [];
+            return [];
         },
 
         // typeOf by Douglas Crockford. modified by JoeSimmons
