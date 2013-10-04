@@ -4,7 +4,7 @@
 // @description   A JavaScript library used by JoeSimmons
 // @include       *
 // @copyright     JoeSimmons
-// @version       1.1.4
+// @version       1.1.5
 // @license       http://creativecommons.org/licenses/by-nc-nd/3.0/us/
 // @grant         none
 // ==/UserScript==
@@ -30,6 +30,9 @@
 
 
 /* CHANGELOG
+
+1.1.5 (10/4/2013)
+    - added JSL.removeEvent() and .removeEvent()
 
 1.1.4 (10/2/2013)
     - made JSL compatible for browsers without ECMAScript-5 (requires ECMAScript-3 at least)
@@ -139,6 +142,8 @@
     - created
 
 */
+
+
 
 (function (window, undefined) {
 
@@ -260,22 +265,47 @@
 
     // a simple class for dealing with event listener handlers
     var handlers = {
-        'stack' : [],
+        stack : [],
 
-        'get' : function (elem) {
+        add : function (thisElement, type, fn) {
+            this.stack.push({
+                element : thisElement,
+                type : type,
+                fn : fn
+            });
+        },
+
+        get : function (thisElement, type) {
             var events = [];
+                type = typeof type === 'string' ? type : '*';
 
-            core.forEach.call(handlers.stack, function (thisEventObj) {
-                if (thisEventObj.element === elem) {
-                    events.push(thisEventObj);
+            JSL.each(this.stack, function (thisEventObj) {
+                if (thisElement === thisEventObj.element) {
+                    if (type === '*' || thisEventObj.type === type) {
+                        events.push(thisEventObj);
+                    }
                 }
             });
 
             return events;
         },
 
-        'add' : function (thisEventObj) {
-            handlers.stack.push(thisEventObj);
+        remove : function (thisElement, type) {
+            var handlerIndices = [], that = this;
+
+            // find all the indices of what we need to remove
+            JSL.each(handlers.get(thisElement, type), function (thisEventObj, index, array) {
+                handlerIndices.push(
+                    core.arr_indexOf.call(that.stack, thisEventObj)
+                );
+            });
+
+            // remove all the indices here, using a separate array of indices
+            // we can't do this as we loop over the (stack) array itself, because
+            // we would be removing values as they are being iterated through
+            JSL.each(handlerIndices, function (thisIndex) {
+                that.stack.splice(thisIndex, 1);
+            });
         }
     };
 
@@ -326,11 +356,11 @@
 
     // will copy an element and return a new copy with
     // the same event listeners
-    function cloneElement(element) {
-        var newElement = element.cloneNode(true);
+    function cloneElement(thisElement) {
+        var newElement = thisElement.cloneNode(true);
 
         // clone event listeners of element
-        core.forEach.call(handlers.get(element), function (thisEventObj) {
+        core.forEach.call(handlers.get(thisElement), function (thisEventObj) {
             JSL.addEvent(newElement, thisEventObj.type, thisEventObj.fn);
         });
 
@@ -349,27 +379,6 @@
 
         // return what was passed, if it wasn't a string
         return passedElement;
-    }
-
-    // function for attaching an event listener
-    function addListener(elem, type, fn) {
-        function callFn() {
-            return fn.apply(elem, arguments);
-        }
-
-        if (typeof elem.addEventListener === 'function') {
-            elem.addEventListener(type, callFn, false);
-        } else if (typeof elem.attachEvent === 'function') {
-            elem.attachEvent(type, callFn, false);
-        } else {
-            return;
-        }
-
-        handlers.add({
-            'type' : type,
-            'fn' : fn,
-            'element' : elem
-        });
     }
 
     // this will add all the childNodes of the
@@ -459,8 +468,9 @@
         },
 
         addEvent : function (type, fn) {
-            JSL.addEvent(this, type, fn);
-            return this;
+            return this.each(function (thisElement) {
+                JSL.addEvent(thisElement, type, fn);
+            });
         },
 
         after : function (passedElement) {
@@ -584,7 +594,9 @@
         },
 
         each : function (fn, oThis) {
-            JSL.each(this, fn, oThis);
+            if (this.length > 0) {
+                JSL.each(this, fn, oThis);
+            }
             return this;
         },
 
@@ -705,6 +717,12 @@
             });
         },
 
+        removeEvent : function (type) {
+            return this.each(function (thisElement) {
+                JSL.removeEvent(thisElement, type);
+            });
+        },
+
         replace : function (passedElement) {
             var newElementsArray = [];
                 passedElement = handleHTMLcreation(passedElement);
@@ -782,19 +800,19 @@
 
     // these methods will get added directly to 'JSL'
     JSL.extend({
-        // internal function for adding event listeners
-        addEvent : function (element, type, fn) {
-            if (element != null && typeof type === 'string' && typeof fn === 'function') {
-                if (element.isJSL === true) {
-                    element.each(function (elem) {
-                        addListener(elem, type, fn);
-                    });
+        addEvent : function (thisElement, type, fn) {
+            if (thisElement != null && typeof type === 'string' && typeof fn === 'function') {
+                if (typeof thisElement.addEventListener === 'function') {
+                    thisElement.addEventListener(type, fn, false);
+                } else if (typeof thisElement.attachEvent === 'function') {
+                    type = 'on' + type;
+                    thisElement.attachEvent(type, fn);
                 } else {
-                    addListener(element, type, fn);
+                    return;
                 }
-            }
 
-            return this;
+                handlers.add(thisElement, type, fn);
+            }
         },
 
         // adds a script tag to the page
@@ -922,6 +940,20 @@
             }
 
             return rand;
+        },
+
+        removeEvent : function (thisElement, type) {
+            JSL.each(handlers.get(thisElement, type), function (thisEventObj) {
+                if (typeof thisElement.removeEventListener === 'function') {
+                    //alert( obj_toString(thisEventObj) );
+                    thisEventObj.element.removeEventListener(thisEventObj.type, thisEventObj.fn, false);
+                } else if (typeof thisElement.detachEvent === 'function') {
+                    type = 'on' + type;
+                    thisEventObj.element.detachEvent(thisEventObj.type, thisEventObj.fn);
+                }
+
+                //handlers.remove(thisElement, type);
+            });
         },
 
         // run a function at a specified document readyState
