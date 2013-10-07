@@ -4,7 +4,7 @@
 // @description   A JavaScript library used by JoeSimmons
 // @include       *
 // @copyright     JoeSimmons
-// @version       1.1.5
+// @version       1.1.6
 // @license       http://creativecommons.org/licenses/by-nc-nd/3.0/us/
 // @grant         none
 // ==/UserScript==
@@ -30,6 +30,16 @@
 
 
 /* CHANGELOG
+
+1.1.6 (10/7/2013)
+    - changed .height() and .width() to .height and .width getters
+        e.g., JSL('#foo').height
+    - changed .exists to .exists
+        e.g., JSL('#foo').exists
+    - fixed .attribute()
+        it now returns a blank string if you pass it one argument and it
+        doesn't find that attribute on any of the elements within
+        or the attributes are null
 
 1.1.5 (10/4/2013)
     - added JSL.removeEvent() and .removeEvent()
@@ -175,7 +185,7 @@
 
             return -1;
         },
-
+        /* not used at the moment
         'filter' : function (fn, oThis) {
             var index, value, len = this.length, ret = [];
 
@@ -188,7 +198,7 @@
 
             return ret;
         },
-
+        */
         'forEach' : function (fn, oThis) {
             var index, len;
 
@@ -259,7 +269,7 @@
         'toString' : getMethod(Object, 'toString'),
     };
 
-    var JSL = function (selector, context) {
+    var JSL = function JSL(selector, context) {
         return new JSL.fn.init(selector, context);
     };
 
@@ -360,7 +370,7 @@
         var newElement = thisElement.cloneNode(true);
 
         // clone event listeners of element
-        core.forEach.call(handlers.get(thisElement), function (thisEventObj) {
+        JSL.each(handlers.get(thisElement), function (thisEventObj) {
             JSL.addEvent(newElement, thisEventObj.type, thisEventObj.fn);
         });
 
@@ -401,7 +411,7 @@
         JSL.each(array, function (currentElement) {
             while ( currentElement = currentElement[key] ) { // note: intentional assignment
                 if (type > 0 ? currentElement.nodeType === type : true) {
-                    if ( isValidSelector === false || JSL(currentElement).filter(selector).exists() ) {
+                    if ( isValidSelector === false || JSL(currentElement).filter(selector).exists ) {
                         newElementsArray.push(currentElement);
                         return;
                     }
@@ -417,7 +427,7 @@
         isJSL : true,
         constructor : JSL,
         length : 0,
-        version : '1.1.4',
+        version : '1.1.5',
 
         // similar to jQuery. JSL is just the init constructor
         init : function (selector, context) {
@@ -528,23 +538,17 @@
         attribute : function (name, value) {
             var ret = '', valueIsString = typeof value === 'string';
 
-            if ( typeof name === 'string' && this.exists() ) {
+            if ( typeof name === 'string' && this.exists ) {
                     this.each(function (elem) {
                         if (valueIsString) {
                             elem.setAttribute(name, value);
                         } else {
-                            ret += elem.getAttribute(name);
+                            ret += elem.getAttribute(name) || '';
                         }
                     });
-
-                // if only one argument was passed, return 'ret'
-                // otherwise, return the JSL object
-                return valueIsString ? this : ret;
             }
 
-            // if no valid name was passed, return JSL object
-            // otherwise, if JSL object empty or name isn't a string, return null
-            return valueIsString ? this : null;
+            return valueIsString ? this : ret;
         },
 
         before : function (passedElement) {
@@ -570,6 +574,10 @@
             }
 
             return JSL(newElementsArray);
+        },
+
+        clone : function () {
+            // TO DO
         },
 
         css : function (name, value) {
@@ -600,7 +608,7 @@
             return this;
         },
 
-        exists : function () {
+        get exists() {
             return this.length > 0 && this[0] != null;
         },
 
@@ -650,7 +658,7 @@
             return JSL.toArray(this);
         },
 
-        height : function () {
+        get height() {
             var arrayOfElemHeights = core.map.call(this, pluck, 'offsetHeight');
             return core.reduce.call(arrayOfElemHeights, sumInt);
         },
@@ -660,7 +668,7 @@
         },
 
         is : function (selector) {
-            return this.filter(selector).exists();
+            return this.filter(selector).exists;
         },
 
         last : function (selector) {
@@ -777,7 +785,11 @@
             });
         },
 
-        width : function () {
+        get visible() {
+            // TO DO
+        },
+
+        get width() {
             return core.reduce.call( core.map.call(this, pluck, 'offsetWidth'), sumInt);
         },
     };
@@ -900,7 +912,7 @@
             }
 
             if (JSL.typeOf(kidsArray) === 'array') {
-                core.forEach.call(kidsArray, function (kid) {
+                JSL.each(kidsArray, function (kid) {
                     if (typeof kid === 'string') {
                         ret.appendChild( JSL.create(kid) );
                     } else if (typeof kid === 'object') {
