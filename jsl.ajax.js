@@ -3,11 +3,14 @@
 // @namespace   http://userscripts.org/users/23652
 // @description An AJAX extension for JSL
 // @include     *
-// @version     1.0.2
+// @version     1.0.21
 // @grant       GM_xmlhttpRequest
 // ==/UserScript==
 
 /* CHANGELOG
+
+1.0.21 (10/6/2013)
+    - fixed bug with .clear()
 
 1.0.2 (10/6/2013)
     - added a new option: async
@@ -80,6 +83,7 @@
 
         function handleEvents(type, resp, event) {
             var event = event || {}, newResp, context;
+                req.delay = req.delay > 15 ? req.delay : 15; // don't want to mess up callbacks
 
             if (xhrCleared === true) {
                 return;
@@ -263,6 +267,9 @@
                 newO.url = url;
                 queue.push(newO);
             });
+
+            // enable ajax if it was cleared earlier
+            xhrCleared = false;
 
             // run the xhr function
             // it will determine whether or not a request needs to be sent
