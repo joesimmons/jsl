@@ -4,18 +4,18 @@
 // @description   A JavaScript library used by JoeSimmons
 // @include       *
 // @copyright     JoeSimmons
-// @version       1.1.6
+// @version       1.1.7
 // @license       http://creativecommons.org/licenses/by-nc-nd/3.0/us/
 // @grant         none
 // ==/UserScript==
 
 
 
-// !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !!
+// !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !!
 
-// NOTE: I RECOMMEND YOU VIEW THIS SOURCE CODE IN A MONOSPACED FONT (Courier, Consolas, etc)
+// NOTE: I RECOMMEND YOU VIEW THIS SOURCE CODE IN A MONOSPACED FONT (Consolas, Courier New, etc)
 
-// !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !!
+// !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !!
 
 
 
@@ -30,6 +30,20 @@
 
 
 /* CHANGELOG
+
+1.1.7 (11/3/2013)
+    - added .center()
+    - added .clone()
+    - added .not()
+    - added .prop()
+    - added .height
+    - added .width
+    - added .visible
+    - fixed a minor bug of passing JSL an element which its typeof === 'function'
+        (YouTube's #movie_player embed element reports as this, as of this current date)
+        it now uses Object.prototype.toString on it and checks for an HTML(...)Element
+    - changed .attribute() so you can now pass any non-null/undefined type as the set value.
+        .setAttribute() on the actual element will handle any type conversion
 
 1.1.6 (10/7/2013)
     - changed .height() and .width() to .height and .width getters
@@ -155,6 +169,14 @@
 
 
 
+/* TODO
+
+    - add .inView or something similar
+
+*/
+
+
+
 (function (window, undefined) {
 
     'use strict'; // use strict mode in ECMAScript-5
@@ -167,6 +189,7 @@
     var rXpath = /^\.?\/{1,2}[a-zA-Z\*]+/;                              // matches an XPath selector
     var rHTML = /<[^>]+>/;                                              // matches HTML strings
     var rHyphenated = /-[a-z]/g;                                        // matches hyphenated strings
+    var rElementObject = /^\[object HTML([a-zA-Z]+)?Element\]$/;        // matches the toString value of an element
 
     // compatibility methods for browsers that
     // don't support ECMAScript-5
@@ -351,16 +374,11 @@
 
     // internal function for throwing errors, so the user gets
     // some sort of hint as to why their operation failed
-    function error(content) {
-        var errorString = '!! - ' + content + ' - !!', method;
-
-        if ( content && (typeof content === 'string' || typeof content === 'number') ) {
-            if ('Error' in window) {
-                throw new Error(errorString);
-            } else if ( 'console' in window && (typeof console.error === 'function' || typeof console.error === 'function') ) {
-                method = console.log || console.error;
-                method.call(console, errorString);
-            }
+    function error(errorString) {
+        if (typeof window.Error === 'function') {
+            throw new Error(errorString);
+        } else if (typeof window.console === 'object' && typeof console.error === 'function') {
+            console.error(errorString);
         }
     }
 
@@ -427,7 +445,7 @@
         isJSL : true,
         constructor : JSL,
         length : 0,
-        version : '1.1.5',
+        version : '1.1.7',
 
         // similar to jQuery. JSL is just the init constructor
         init : function (selector, context) {
@@ -435,6 +453,7 @@
 
             if (typeof selector === 'string') {
                 if ( rXpath.test(selector) ) {
+                    // handle an XPath expression
                     elems = JSL.xpath({expression : selector, type : 7, context : context});
                 } else if ( rHTML.test(selector) ) {
                     // reserved for html code creation
@@ -451,12 +470,19 @@
                 }
             } else if (typeof selector === 'object' && selector != null) {
                 if (selector.isJSL === true) {
+                    // handle a JSL object
                     return selector;
                 } else if ( core.hasOwnProperty.call(selector, 'length') ) {
+                    // handle an array-like object
                     elems = selector;
-                } else {
+                } else if ( core.toString.call(selector).match(rElementObject) ) {
+                    // handle a single element
                     elems = [selector];
                 }
+            } else if ( core.toString.call(selector).match(rElementObject) ) {
+                // handle elements that are typeof === 'function'
+                // e.g., object, applet, embed
+                elems = [selector];
             }
 
             // define the length property of our object wrapper
@@ -473,7 +499,7 @@
 
         add : function (selector) {
             var newElements = JSL(selector).raw(),
-                allElements = this.raw().concat(newElements);
+                allElements = core.concat.call(this.raw(), newElements);
             return JSL(allElements);
         },
 
@@ -536,11 +562,11 @@
         },
 
         attribute : function (name, value) {
-            var ret = '', valueIsString = typeof value === 'string';
+            var ret = '', valueIsValid = value != null;
 
             if ( typeof name === 'string' && this.exists ) {
                     this.each(function (elem) {
-                        if (valueIsString) {
+                        if (valueIsValid) {
                             elem.setAttribute(name, value);
                         } else {
                             ret += elem.getAttribute(name) || '';
@@ -548,7 +574,7 @@
                     });
             }
 
-            return valueIsString ? this : ret;
+            return valueIsValid ? this : ret;
         },
 
         before : function (passedElement) {
@@ -576,8 +602,22 @@
             return JSL(newElementsArray);
         },
 
+        center : function () {
+            return this.each(function (thisElement) {
+                thisElement = JSL(thisElement);
+                thisElement.css('position', 'fixed');
+                thisElement.css('top', Math.floor( (window.innerHeight - thisElement.height) / 2 ) + 'px');
+                thisElement.css('left', Math.floor( (window.innerWidth - thisElement.width) / 2 ) + 'px');
+            });
+        },
+
         clone : function () {
-            // TO DO
+            // shallow cloning, at the moment
+            return JSL(
+                core.map.call(this, function (thisElement) {
+                    return cloneElement(thisElement);
+                })
+            );
         },
 
         css : function (name, value) {
@@ -592,9 +632,9 @@
                             thisElement.style[name] = value;
                         }
                     });
-                } else {
-                    return core.map.call(this, pluck, 'style.' + name).join('');
                 }
+
+                return core.map.call(this, pluck, 'style.' + name).join('');
             }
 
             // return JSL object if name isn't a string
@@ -616,7 +656,7 @@
             var newElementsArray = [];
 
             if ( typeof selector === 'string' && rSelector.test(selector) ) {
-                JSL.each(this, function (thisElement) {
+                this.each(function (thisElement) {
                     var docFrag = document.createDocumentFragment(),
                         thisElementClone = thisElement.cloneNode(false); // non-deep search
                         docFrag.appendChild(thisElementClone);
@@ -638,7 +678,7 @@
                 return JSL.toArray(matches);
             });
             var singleArrayOfMatches = arrayOfMatchesArrays.length > 0 ? core.reduce.call(arrayOfMatchesArrays, function (a, b) {
-                return a.concat(b);
+                return core.concat.call(a, b);
             }) : [];
 
             return JSL(singleArrayOfMatches);
@@ -667,6 +707,22 @@
             return this.css('display', 'none');
         },
 
+        /*
+        get inView(passedContainer) {
+            var isInView = false;
+            
+            this.each(function (thisElement) {
+                var container = passedContainer || thisElement.parentNode;
+                var visible = !!( (container.scrollTop + container.offsetHeight) >= thisElement.offsetTop &&
+                           (container.scrollTop - thisElement.offsetHeight) <= thisElement.offsetTop );
+
+                if (visible) {
+                    isInView = true;
+                }
+            });
+        },
+        */
+
         is : function (selector) {
             return this.filter(selector).exists;
         },
@@ -677,6 +733,20 @@
 
         next : function (selector) {
             return JSL( getEachElements(this, selector, 'nextSibling', 1) );
+        },
+
+        not : function (selector) {
+            var newElementsArray = [];
+
+            if ( typeof selector === 'string' && rSelector.test(selector) ) {
+                this.each(function (thisElement) {
+                    if ( !JSL(thisElement).is(selector) ) {
+                        newElementsArray.push(thisElement);
+                    }
+                });
+            }
+
+            return JSL(newElementsArray);
         },
 
         parent : function (selector) {
@@ -712,6 +782,22 @@
             return JSL( getEachElements(this, selector, 'previousSibling', 1) );
         },
 
+        prop : function (name, value) {
+            var ret = '', valueIsValid = value != null;
+
+            if (typeof name === 'string' && this.exists) {
+                    this.each(function (thisElement) {
+                        if (valueIsValid) {
+                            thisElement[name] = value;
+                        } else {
+                            ret += thisElement[name] || '';
+                        }
+                    });
+            }
+
+            return valueIsValid ? this : ret;
+        },
+
         raw : function () {
             return [].slice.call(this, 0);
         },
@@ -735,7 +821,7 @@
             var newElementsArray = [];
                 passedElement = handleHTMLcreation(passedElement);
 
-            this.each(function (element, index) {
+            this.each(function (element) {
                 var newElement = cloneElement(passedElement),
                     parent = element.parentNode;
 
@@ -781,16 +867,23 @@
 
         toggle : function () {
             return this.each(function (thisElement) {
-                thisElement.style.display === 'none' ? JSL(this).show() : JSL(this).hide();
+                thisElement = JSL(thisElement);
+
+                if (thisElement.visible) {
+                    thisElement.hide();
+                } else {
+                    thisElement.show();
+                }
             });
         },
 
         get visible() {
-            // TO DO
+            return Math.max(this.width, this.height) > 0;
         },
 
         get width() {
-            return core.reduce.call( core.map.call(this, pluck, 'offsetWidth'), sumInt);
+            var arrayOfElemHeights = core.map.call(this, pluck, 'offsetWidth');
+            return core.reduce.call(arrayOfElemHeights, sumInt);
         },
     };
 
@@ -1102,7 +1195,7 @@
                 },
                 expression = obj.expression,
                 context = obj.context || document,
-                doc = context.evaluate ? context : document,
+                doc = typeof context.evaluate === 'function' ? context : document,
                 xp = doc.evaluate(expression, context, null, type, null);
 
             if (!expression) {
