@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>JSL test with QUnit</title>
+        <link rel="stylesheet" href="resources/qunit.css">
+        <script src="../jsl.user.js"></script>
+        <script type="text/javascript">
+            function id(q) {
+                return document.getElementById(q);
+            }
+        </script>
+    </head>
+
+    <body>
+        <div id="qunit"></div>
+        <div id="qunit-fixture">
+            <div>
+                <p id="test-p">Hello world</p>
+            </div>
+            <input type="checkbox" name="some-checkbox" id="some-checkbox" />
+        </div>
+
+        <script src="resources/qunit.js"></script>
+        <script src="test.js"></script>
+    </body>
+</html>
