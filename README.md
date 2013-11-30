@@ -1,4 +1,4 @@
-## About JoeSimmons' Library
+# About JoeSimmons' Library
 
 **JSL** is a lightweight library that functions similar to _jQuery_. It is extendable via `JSL.fn`
 
