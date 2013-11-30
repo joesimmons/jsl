@@ -10,13 +10,17 @@ For API documentation, check the [methods][methods] page.
 
 ---
 
-## Notes
-* I recommend you view the source code in a monospaced font *(Consolas, Courier New, etc)*
+### Notes
+  * I recommend you view the source code in a monospaced font *(Consolas, Courier New, etc)*
+  * This library uses [Semantic Versioning][semver] as of JSL **v1.2.0**
 
 ---
 
-## TO-DO
-* add `JSL(...).inView` or a similar method to determine if an element is in the browser's viewport
+### TO-DO
+  * allow `JSL.random()` to accept a second argument (minimum integer)
+  * add `.inView` or a similar method to determine if an element is in the browser's viewport
+  * add `JSL.toString()` - will return a string containing the best way to represent the passed value's contents
+  * add `JSL.waitFor()` - very similar to waitForKeyElements but with a verifier function
 
   [gm]: https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/
   [methods]: https://github.com/joesimmons/jsl/wiki/_pages

@@ -15,10 +15,22 @@
     <body>
         <div id="qunit"></div>
         <div id="qunit-fixture">
-            <div>
-                <p id="test-p">Hello world</p>
+            <div id="test-p-container">
+                <p id="test-p">Hello, I'm test-p</p>
             </div>
             <input type="checkbox" name="some-checkbox" id="some-checkbox" />
+            <div id="w400px" class="skinny" style="width: 400px;">
+                hello
+            </div>
+            <div id="h400px" class="skinny" style="height: 400px;">
+                hello
+            </div>
+            <select id="select">
+                <option value="one">One</option>
+                <option value="two" selected>Two</option>
+                <option value="three">Three</option>
+            </select>
+            <input type="text" value="foo" id="textbox" />
         </div>
 
         <script src="resources/qunit.js"></script>

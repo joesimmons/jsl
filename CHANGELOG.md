@@ -1,18 +1,43 @@
+# 1.2.0 (11/29/2013)
+```
+    - added JSL.alias()
+    - added .has()
+    - added .isnt()
+    - added .removeAttribute()
+    - added .value()
+    - added the ability to pass .add() a second argument (context node)
+    - added a qunit test (to the GitHub repo) so people can test the code
+    - adopted Semantic Versioning ==> http://semver.org/spec/v2.0.0.html
+    - moved the changelog into a separate file to reduce file size
+    - you can now return 'stop' in a JSL.each() or .each() function to stop the iteration
+    - fixed a bug with not being able to pass .show() an empty string to
+        signify setting its display to default
+    - fixed a bug with .prop() not always returning the correct type of value
+    - you can now pass JSL
+        - a window object as the first argument
+        - a string or a JSL object as the second argument
+    - the kidsArray argument in JSL.create() can now accept strings as well as elements
+        - no more need to nest JSL.create() calls inside the array
+    - the following methods will now accept ANY valid arguments that JSL.create() will accept
+        ( no more nesting JSL.create() calls inside .append() )
+            .after()
+            .append()
+            .before()
+            .prepend()
+            .replace()
+```
+
+---
+
 # 1.1.7 (11/3/2013)
 ```
     - added .center()
     - added .clone()
-    - added .height
-    - added .isnt()
     - added .not()
     - added .prop()
-    - added .removeAttribute()
-    - added .value()
-    - added .visible
+    - added .height
     - added .width
-    - adopted Semantic Versioning ==> http://semver.org/spec/v2.0.0.html
-    - fixed a bug with not being able to pass .show() an empty string to
-        signify setting its display to blank/default
+    - added .visible
     - fixed a minor bug of passing JSL an element which its typeof === 'function'
         (YouTube's #movie_player embed element reports as this, as of this current date)
         it now uses Object.prototype.toString on it and checks for an HTML(...)Element
