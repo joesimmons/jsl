@@ -1,3 +1,12 @@
+# 1.2.1 (12/2/2013)
+```
+    - added a "versions" folder for different versions of JSL
+        latest version will always be "jsl.user.js" in the root folder
+    - fixed bug in JSL.typeOf() where you pass it an <embed> element, and it says its a function
+```
+
+---
+
 # 1.2.0 (11/29/2013)
 ```
     - added JSL.alias()

@@ -4,7 +4,7 @@
 // @description   A JavaScript library used by JoeSimmons
 // @include       *
 // @copyright     JoeSimmons
-// @version       1.2.1
+// @version       1.2.0
 // @license       http://creativecommons.org/licenses/by-nc-nd/3.0/us/
 // @grant         GM_addStyle
 // ==/UserScript==
@@ -17,7 +17,7 @@
 
     'use strict'; // use strict mode in ECMAScript-5
 
-    var version = '1.2.1'; // this will be used for JSL.prototype.version
+    var version = '1.2.0'; // this will be used for JSL.prototype.version
     var intervals = []; // for the setInterval/clearInterval methods
 
     // regular expressions
@@ -861,6 +861,10 @@
             }
         },
 
+        // adds a script tag to the page
+        // syntax: JSL.addScript( 'var x = 0;' , null , head_node )
+        // 2nd argument required but technically optional. it will set the ID of the script tag. pass it null if you want a random ID
+        // 3rd argument optional. it will add the style tag to the head if omitted
         addScript : function (contents, id, node) {
             var newElement = document.createElement('script');
             newElement.id = id || ( 'jsl-script-' + JSL.random(999) );
@@ -876,6 +880,10 @@
             };
         },
 
+        // adds a style to the node you want, or the head node of the current document
+        // syntax: JSL.addStyle( '.classname { color: red; }' , document )
+        // 2nd argument is optional
+        // 3rd argument is optional
         addStyle : function (css, id, node) {
             id = id || ( 'jsl-style-' + JSL.random(999) );
             node = node || document.head || document.querySelector('html > head');
@@ -981,6 +989,8 @@
             }
         },
 
+        // return a random integer between 0 and max
+        // syntax: JSL.random( 50 )
         random : function (maxInteger) {
             var rand = 0;
 
@@ -994,16 +1004,19 @@
         removeEvent : function (thisElement, type) {
             JSL.each(handlers.get(thisElement, type), function (thisEventObj) {
                 if (typeof thisElement.removeEventListener === 'function') {
+                    //alert( obj_toString(thisEventObj) );
                     thisEventObj.element.removeEventListener(thisEventObj.type, thisEventObj.fn, false);
                 } else if (typeof thisElement.detachEvent === 'function') {
                     type = 'on' + type;
                     thisEventObj.element.detachEvent(thisEventObj.type, thisEventObj.fn);
                 }
 
-                handlers.remove(thisElement, type);
+                //handlers.remove(thisElement, type);
             });
         },
 
+        // run a function at a specified document readyState
+        // syntax: JSL.runAt( 'complete', someFunc [, thisValue] [, ...otherArguments] );
         runAt : function (state, func, oThis) {
             var args = JSL.toArray(arguments), intv,
 
@@ -1037,6 +1050,9 @@
             }
         },
 
+        // setInterval is unreliable. this is a replacement for it using setTimeout with drift accomodation
+        // syntax: JSL.setInterval(func, delay)
+        // runs exactly like a real setInterval, but it's based on setTimeout, which is more reliable
         setInterval : function (func, delay) {
             var index = intervals.length,
                 delay_orig = delay,
@@ -1072,6 +1088,8 @@
             return index;
         },
 
+        // converts a list of some sort to an array (e.g., NodeList, HTMLCollection, 'arguments' parameter, xpath snapshots, etc)
+        // syntax: JSL.toArray( some_list )
         toArray : function (arr) {
             var newArr = [], // new array to store the values into
                 len = arr.length || arr.snapshotLength,
@@ -1113,7 +1131,7 @@
         typeOf : function (value) {
             var s = typeof value,
                 ostr = core.toString.call(value);
-            if (s === 'object' || s === 'function') {
+            if (s === 'object') {
                 if (value) {
                     if (ostr === '[object Array]') {
                         s = 'array';
@@ -1156,6 +1174,8 @@
         },
         */
 
+        // return an xpath result    (type + context are optional)
+        // syntax: JSL.xpath( { expression : '//a', type : 6, context : document } )
         xpath : function (obj) {
             var type = obj.type || 7,
                 types = {
@@ -1193,12 +1213,10 @@
     // assign JSL to the window object
     window.JSL = window._J = JSL;
 
-    // just for testing purposes
-    // unsafeWindow.JSL = unsafeWindow._J = JSL;
-
 }(window));
 
-/* 
+
+/*
 // JSL test button
 // use it to test code on user click (non-automatic)
 (function () {
@@ -1227,4 +1245,4 @@
 
     mo.observe( JSL('#jsl_user_test')[0], { attributes : true } );
 }());
- */
+*/

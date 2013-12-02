@@ -4,32 +4,195 @@
 // @description   A JavaScript library used by JoeSimmons
 // @include       *
 // @copyright     JoeSimmons
-// @version       1.2.1
+// @version       1.1.7
 // @license       http://creativecommons.org/licenses/by-nc-nd/3.0/us/
-// @grant         GM_addStyle
+// @grant         none
 // ==/UserScript==
 
-/**
-    WIKI ==> https://github.com/joesimmons/jsl/wiki/
-**/
+
+
+// !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !!
+
+// NOTE: I RECOMMEND YOU VIEW THIS SOURCE CODE IN A MONOSPACED FONT (Consolas, Courier New, etc)
+
+// !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !! - !!
+
+
+
+
+/* @ @ @ @ @ @ @ @ @ @ @ @ @   W I K I   @ @ @ @ @ @ @ @ @ @ @ @ @ @ @
+
+                  https://github.com/joesimmons/jsl/wiki/
+
+@ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ @ */
+
+
+
+
+/* CHANGELOG
+
+1.1.7 (11/3/2013)
+    - added .center()
+    - added .clone()
+    - added .not()
+    - added .prop()
+    - added .height
+    - added .width
+    - added .visible
+    - fixed a minor bug of passing JSL an element which its typeof === 'function'
+        (YouTube's #movie_player embed element reports as this, as of this current date)
+        it now uses Object.prototype.toString on it and checks for an HTML(...)Element
+    - changed .attribute() so you can now pass any non-null/undefined type as the set value.
+        .setAttribute() on the actual element will handle any type conversion
+
+1.1.6 (10/7/2013)
+    - changed .height() and .width() to .height and .width getters
+        e.g., JSL('#foo').height
+    - changed .exists to .exists
+        e.g., JSL('#foo').exists
+    - fixed .attribute()
+        it now returns a blank string if you pass it one argument and it
+        doesn't find that attribute on any of the elements within
+        or the attributes are null
+
+1.1.5 (10/4/2013)
+    - added JSL.removeEvent() and .removeEvent()
+
+1.1.4 (10/2/2013)
+    - made JSL compatible for browsers without ECMAScript-5 (requires ECMAScript-3 at least)
+    - added JSL.each()
+    - changed .first() to .prepend()
+    - added .first(), .height(), .last(), .prev(), .next(), .width()
+        check the wiki for explanations
+    - modified .get()
+        will take an integer (positive or negative) and return a new JSL object with that single element
+    - simplified several methods to shorten code and improve readability
+    - changed the init so that if you pass an array of elements as the context,
+        it will do a deep search of their children, but not the elements themselves
+        e.g., JSL( '#foo', [bar, baz] ) is the same as JSL( [bar, baz] ).find('#foo')
+        it will not match bar or baz, but it can match any of their children
+
+1.1.3 (10/1/2013)
+    - drastic change. made JSL more similar to jQuery
+        the main methods (JSL.runAt, JSL.addScript, etc) are the same but the
+        DOM methods are different. the elements are in a wrapper now, like JSL('#foo').show()
+        because of the wrapper, JSL.id, JSL.query, & JSL.queryAll are gone
+        read the wiki.
+    - added add()
+    - added an alias to JSL
+        JSL can now also be used (by default) by using _J()
+        (underscore and upper-case J)
+        e.g., _J('#foo').show()
+    - added JSL.addEvent
+        e.g., JSL.addEvent(elem, 'click', fn);
+    - added JSL.loop() ==> will take a function and call it a specified number of times
+        e.g., JSL.loop(50, fn);
+    - added ability to pass JSL.create a string of HTML and have it return a tree of nodes
+    - JSL.xpath now returns an array instead of an XPath snapshot
+        except in the case that you want a type like singleNodeValue, stringValue, etc
+
+1.1.2 (9/17/2013)
+    - updated JSL.create a little
+    - updated JSL.runAt to be shorter and faster
+        plus it can now take a custom 'this' value and extra arguments
+        to be passed to the callback function
+
+1.1.1 (9/3/2013)
+    - added JSL.runAt for running functions at specified dom ready states
+
+1.1.0 (8/30/2013)
+    - updated JSL.toArray to work with xpath snapshots as well
+
+1.0.9
+    - added JSL.toArray (using Array's slice method works but it's not compatible with all browers)
+        it will take whatever you throw at it and convert it to an array
+        if it has a '.length' property
+            e.g., HTML Collections, Node Lists, the 'arguments' parameter used in functions, etc
+    - updated JSL.typeOf to include HTML Collections, Node Lists, and the 'arguments' parameter
+
+1.0.8
+    - added JSL.typeOf
+        it will return 'array' on arrays, 'null' on null, 'element' on an element
+        and the other regular types
+    - modified JSL.[after/before/hide/show/remove/replace] to use JSL.elem()
+        it will take a string argument and find out if the user wanted
+        an xpath expression, a query selector, or an id.
+        if the argument isn't a string, it returns itself.
+        in the case that the user supplied an element, it will work as usual
+            e.g., you can now do JSL.show('root') and it will show the ID 'root'
+            you won't need to do JSL.show( JSL.id('root') )    (same for hide, show, remove, etc)
+                backwards compatibility supports that older method, though
+    - added the ability to rename this library's reference ('JSL')
+        it's now dynamic and doesn't rely on the variable name you declare it with.
+        you can either includ the source in your code and rename the variable that way,
+        or you can simply just do
+            var JSLib = JSL;
+            'JSLib' in this case can be named whatever you wish
+
+1.0.7
+    - fixed JSL.id, JSL.query, and JSL.queryAll.
+        there was an unthrown bug before where if the second argument
+        was null (falsy), it would run the query from 'document' instead
+        of returning null like it should, since the context node was null
+
+1.0.6
+    - removed HTMLElement method .before() and .after() because they weren't getting set early enough.
+        to fix this, the user would've had to set '@run-at' to 'document-start' on every script.
+        I, instead, replaced them with JSL.before() and JSL.after()
+        syntax examples are below (as usual), where I define the methods
+
+1.0.5
+    - fixed JSL.setInterval
+        it now has drift accommodation and works uniformly on all browsers (unlike DOM's setInterval)
+
+1.0.4
+    - fixed some problems with adding style attributes in Chrome with create()
+
+1.0.3
+    - added short syntax examples for each method
+    - added optional context nodes for query(), queryAll(), and id()
+
+1.0.2
+    - changed create() back so you have to pass 'text' as the first argument, then your text as the second argument.
+            It -will- stay this way
+    - added addStyle()
+    - added a third argument to addScript(code_string, id, head_node)
+            head_node is optional
+
+1.0.1
+    - changed create() so if you pass it one argument, a string, it will create that as text
+
+1.0.0
+    - created
+
+*/
+
+
+
+/* TODO
+
+    - add .inView or something similar
+
+*/
+
+
 
 (function (window, undefined) {
 
     'use strict'; // use strict mode in ECMAScript-5
 
-    var version = '1.2.1'; // this will be used for JSL.prototype.version
-    var intervals = []; // for the setInterval/clearInterval methods
+    // initialize an array for the [set/clear]Interval methods
+    var intervals = [];
 
     // regular expressions
-    var rSelector = /^\*|^\.[a-z][\w\d-]*|^#[^ ]+|^[a-z]+|^\[a-z]+/i; // matches a CSS selector
-    var rXpath = /^\.?\/{1,2}[a-zA-Z\*]+/;                            // matches an XPath query
-    var rHTML = /<[^>]+>/;                                            // matches a string of HTML
-    var rHyphenated = /-([a-zA-Z])/g;                                 // matches alphabetic, hyphenated strings
-    var rElementObject = /^\[object HTML([a-zA-Z]+)?Element\]$/;      // matches the toString value of an element
-    var rWindowObject = /^\[object Window\]$/;                        // matches the toString value of a window object
-    var rValidVarname = /^[a-zA-Z$_][a-zA-Z0-9$_]*$/;                 // matches a valid variable name
+    var rSelector = /^\*|^\.[a-z][\w\d-]*|^#[^ ]+|^[a-z]+|^\[a-z]+/i;   // matches a CSS selector
+    var rXpath = /^\.?\/{1,2}[a-zA-Z\*]+/;                              // matches an XPath selector
+    var rHTML = /<[^>]+>/;                                              // matches HTML strings
+    var rHyphenated = /-[a-z]/g;                                        // matches hyphenated strings
+    var rElementObject = /^\[object HTML([a-zA-Z]+)?Element\]$/;        // matches the toString value of an element
 
-    // compatibility methods for browsers that don't support ECMAScript-5
+    // compatibility methods for browsers that
+    // don't support ECMAScript-5
     var compat = {
         'arr_indexOf' : function (searchElement, fromIndex) {
             var index = parseInt(fromIndex || 0, 10), len = this.length;
@@ -45,7 +208,7 @@
 
             return -1;
         },
-        /*
+        /* not used at the moment
         'filter' : function (fn, oThis) {
             var index, value, len = this.length, ret = [];
 
@@ -62,19 +225,21 @@
         'forEach' : function (fn, oThis) {
             var index, len;
 
-            for (index = 0, len = this.length; index < len; index += 1) {
+            for (index = 0, len = this.length; index < len && index in this; index += 1) {
                 fn.call(oThis, this[index], index, this);
             }
         },
+
         'map' : function (fn, oThis) {
             var index, newArr = [], len;
 
-            for (index = 0, len = this.length; index < len; index += 1) {
+            for (index = 0, len = this.length; index < len && index in this; index += 1) {
                 newArr[index] = fn.call(oThis, this[index], index, this);
             }
 
             return newArr;
         },
+
         'reduce' : function (fn, initialValue) {
             var index, len, value, isValueSet = false;
 
@@ -96,26 +261,28 @@
         }
     };
 
-    // gets a method from an object's prototype. returns undefined if not found
+    // gets a method from an object's prototype. returns undefined if it fails
     var getMethod = function (obj, method) {
+        var uObj = obj;
+
         if (typeof XPCNativeWrapper === 'function' && typeof XPCNativeWrapper.unwrap === 'function') {
-            obj = XPCNativeWrapper.unwrap(obj);
+            uObj = XPCNativeWrapper.unwrap(obj);
         } else if (obj.wrappedJSObject) {
-            obj = obj.wrappedJSObject;
+            uObj = obj.wrappedJSObject;
         }
 
-        if (obj.prototype && typeof obj.prototype[method] === 'function') {
-            return obj.prototype[method];
+        if (uObj.prototype && typeof uObj.prototype[method] === 'function') {
+            return uObj.prototype[method];
         }
     };
 
     // original methods for some common uses
     var core = {
         // array
-        'arr_indexOf' : getMethod(Array, 'indexOf') || compat.arr_indexOf,
         'concat' : getMethod(Array, 'concat'),
         'filter' : getMethod(Array, 'filter') || compat.filter,
         'forEach' : getMethod(Array, 'forEach') || compat.forEach,
+        'arr_indexOf' : getMethod(Array, 'indexOf') || compat.arr_indexOf,
         'map' : getMethod(Array, 'map') || compat.map,
         'reduce' : getMethod(Array, 'reduce') || compat.reduce,
         'slice' : getMethod(Array, 'slice'),
@@ -175,38 +342,6 @@
         }
     };
 
-    // Node.prototype.matchesSelector compat for vendor prefixes
-    function matchesSelector(element, selector) {
-        if (element && typeof selector === 'string') {
-            if (typeof element.mozMatchesSelector === 'function') {
-                // Mozilla
-                return element.mozMatchesSelector(selector);
-            } else if (typeof element.webkitMatchesSelector === 'function') {
-                // Webkit
-                return element.webkitMatchesSelector(selector);
-            } else if (typeof element.oMatchesSelector === 'function') {
-                // Opera
-                return element.oMatchesSelector(selector);
-            } else if (typeof element.msMatchesSelector === 'function') {
-                // IE
-                return element.msMatchesSelector(selector);
-            }
-        }
-
-        return false;
-    }
-
-    // calls 'this' with the first parameter as the first argument 
-    function call(a) {
-        return this(a);
-    }
-
-    function toCamelCase(string) {
-        return string.replace(rHyphenated, function (fullMatch, firstGroup) {
-            return firstGroup.toUpperCase();
-        });
-    }
-
     // walkTheDom by Douglas Crockford
     function walkTheDom(node, func) {
         func(node);
@@ -233,12 +368,8 @@
         return ret;
     }
 
-    function sum(curValue, nextValue) {
-        return curValue + nextValue;
-    }
-
-    function sumInt(curValue, nextValue) {
-        return parseInt(curValue, 10) + parseInt(nextValue, 10);
+    function sumInt(a, b) {
+        return parseInt(a, 10) + parseInt(b, 10);
     }
 
     // internal function for throwing errors, so the user gets
@@ -251,7 +382,8 @@
         }
     }
 
-    // will copy an element and return a new copy with the same event listeners
+    // will copy an element and return a new copy with
+    // the same event listeners
     function cloneElement(thisElement) {
         var newElement = thisElement.cloneNode(true);
 
@@ -261,6 +393,33 @@
         });
 
         return newElement;
+    }
+
+    // handles passed HTML strings. either creates node trees or text nodes
+    function handleHTMLcreation(passedElement) {
+        if (typeof passedElement === 'string') {
+            if ( rHTML.test(passedElement) ) {
+                return JSL.create(passedElement);
+            } else {
+                return JSL.create('text', passedElement);
+            }
+        }
+
+        // return what was passed, if it wasn't a string
+        return passedElement;
+    }
+
+    // this will add all the childNodes of the
+    // passed document fragment to 'arrayToAddTo'
+    // if not a document fragment, it will just add that element to 'arrayToAddTo'
+    function addNewReturnElements(newElement, arrayToAddTo) {
+        if (newElement.nodeType === 11) {
+            JSL.each(newElement.childNodes, function (thisNewElement) {
+                arrayToAddTo.push(thisNewElement);
+            });
+        } else {
+            arrayToAddTo.push(newElement);
+        }
     }
 
     function getEachElements(array, selector, key, type) {
@@ -281,108 +440,49 @@
         return newElementsArray;
     }
 
-    // this will take 
-    function doElementOperationOnEach(args, op) {
-        var newElementsArray = [], newElement,
-            passedElements = JSL.create.apply(JSL, args);
-
-        if (this.exists) {
-            if (JSL.typeOf(passedElements) === 'array') {
-                this.each(function (thisElement) {
-                    JSL.each(passedElements, function (passedElement) {
-                        // clone the element
-                        var newElement = cloneElement(passedElement);
-
-                        // add the new elements to an array
-                        newElementsArray.push(newElement);
-
-                        // perform the passed operation on the element
-                        op(thisElement, newElement);
-                    });
-                });
-            } else {
-                this.each(function (thisElement) {
-                    // clone the element
-                    var newElement = cloneElement(passedElements);
-
-                    // add the new elements to an array
-                    newElementsArray.push(newElement);
-
-                    // perform the passed operation on the element
-                    op(thisElement, newElement);
-                });
-            }
-        }
-
-        return newElementsArray;
-    }
-
     // define JSL's prototype, aka JSL.fn
     JSL.fn = JSL.prototype = {
         isJSL : true,
         constructor : JSL,
         length : 0,
-        version : version,
+        version : '1.1.7',
 
         // similar to jQuery. JSL is just the init constructor
         init : function (selector, context) {
-            var selectorStringValue = core.toString.call(selector),
-                that = this,
-                elems = [];
+            var that = this, elems = [];
 
-            switch (typeof selector) {
-                case 'string': {  // -- STRING --
-                    if ( selector.match(rXpath) ) {
-                        // handle an XPath expression
-                        elems = JSL.xpath({expression : selector, type : 7, context : context});
-                    } else if ( selector.match(rHTML) ) {
-                        // reserved for html code creation
-                        // not sure if I want to implement it
-                    } else if ( selector.match(rSelector) ) {
-                        if (JSL.typeOf(context) === 'array') {
-                            // handle an array being passed as the context
-                            return that.find.call(context, selector);
-                        } else if (typeof context === 'string') {
-                            // handle a selector being passsed as the context
-                            context = JSL(context);
-                            if (context.exists) {
-                                return JSL(selector, context[0]);
-                            }
-                        } else if (context != null && context.isJSL === true && context.exists) {
-                            // handle a JSL object being passsed as the context
-                            return JSL( selector, context[0] );
-                        } else {
-                            // handle a regular element being passed as the context
-                            context = context != null && context.querySelectorAll ? context : document;
-                            elems = context.querySelectorAll(selector);
-                        }
-                    }
-                    break;
-                }
-                // ---------------------------------------------------
-                case 'object': {  // -- OBJECT --
-                    if (selector != null) {
-                        if (selector.isJSL === true) {
-                            // handle a JSL object
-                            return selector;
-                        } else if ( core.hasOwnProperty.call(selector, 'length') ) {
-                            // handle an array-like object
-                            elems = selector;
-                        } else if ( selectorStringValue.match(rElementObject) || selectorStringValue.match(rWindowObject) ) {
-                            // handle a single element
-                            elems = [selector];
-                        }
-                    }
-                    break;
-                }
-                // ---------------------------------------------------
-                default: {        // -- UNKNOWN --
-                    if ( selectorStringValue.match(rElementObject) || selectorStringValue.match(rWindowObject) ) {
-                        // handle elements that are typeof === 'function'
-                        // e.g., object, applet, embed
-                        elems = [selector];
+            if (typeof selector === 'string') {
+                if ( rXpath.test(selector) ) {
+                    // handle an XPath expression
+                    elems = JSL.xpath({expression : selector, type : 7, context : context});
+                } else if ( rHTML.test(selector) ) {
+                    // reserved for html code creation
+                    // not sure if I want to implement it
+                } else if ( rSelector.test(selector) ) {
+                    if (JSL.typeOf(context) === 'array') {
+                        // handle an array being passed as the context
+                        return that.find.call(context, selector);
+                    } else {
+                        // handle a regular element being passed as the context
+                        context = context != null && context.querySelectorAll ? context : document;
+                        elems = context.querySelectorAll(selector);
                     }
                 }
+            } else if (typeof selector === 'object' && selector != null) {
+                if (selector.isJSL === true) {
+                    // handle a JSL object
+                    return selector;
+                } else if ( core.hasOwnProperty.call(selector, 'length') ) {
+                    // handle an array-like object
+                    elems = selector;
+                } else if ( core.toString.call(selector).match(rElementObject) ) {
+                    // handle a single element
+                    elems = [selector];
+                }
+            } else if ( core.toString.call(selector).match(rElementObject) ) {
+                // handle elements that are typeof === 'function'
+                // e.g., object, applet, embed
+                elems = [selector];
             }
 
             // define the length property of our object wrapper
@@ -397,9 +497,8 @@
             return that;
         },
 
-        // --- STARTING LINE FOR THE JSL WRAPPER METHODS
-        add : function (selector, context) {
-            var newElements = JSL(selector, context).raw(),
+        add : function (selector) {
+            var newElements = JSL(selector).raw(),
                 allElements = core.concat.call(this.raw(), newElements);
             return JSL(allElements);
         },
@@ -410,29 +509,54 @@
             });
         },
 
-        after : function () {
-            var newElementsArray = doElementOperationOnEach.call(this, JSL.toArray(arguments), function (baseElement, newElement) {
-                var parent = baseElement.parentNode,
-                    next = baseElement.nextSibling;
+        after : function (passedElement) {
+            var newElementsArray = [];
+                passedElement = handleHTMLcreation(passedElement);
 
-                if (parent) {
-                    if (next) {
-                        // add the newElement after the current element
-                        parent.insertBefore(newElement, next);
-                    } else {
-                        // nextSibling didn't exist. just append to its parent
-                        parent.appendChild(newElement);
+            // filter null/undefined values
+            if (passedElement != null) {
+                this.each(function (element) {
+                    var newElement = cloneElement(passedElement),
+                        parent = element.parentNode,
+                        next = element.nextSibling;
+
+                    if (parent) {
+                        // add the new elements to the new elements array
+                        // this is so that what's returned is a JSL object
+                        // containing the new elements, not the old ones
+                        addNewReturnElements(newElement, newElementsArray);
+
+                        if (next) {
+                            // add the newElement after the current element
+                            parent.insertBefore(newElement, next);
+                        } else {
+                            // nextSibling didn't exist. just append to its parent
+                            parent.appendChild(newElement);
+                        }
                     }
-                }
-            });
+                });
+            }
 
             return JSL(newElementsArray);
         },
 
-        append : function () {
-            var newElementsArray = doElementOperationOnEach.call(this, JSL.toArray(arguments), function (baseElement, newElement) {
-                baseElement.appendChild(newElement);
-            });
+        append : function (passedElement) {
+            var newElementsArray = [];
+                passedElement = handleHTMLcreation(passedElement);
+
+            // filter null/undefined values
+            if (passedElement != null) {
+                this.each(function (thisElement) {
+                    var newElement = cloneElement(passedElement);
+
+                    // add the new elements to the new elements array
+                    // this is so that what's returned is a JSL object
+                    // containing the new elements, not the old ones
+                    addNewReturnElements(newElement, newElementsArray);
+
+                    thisElement.appendChild(newElement);
+                });
+            }
 
             return JSL(newElementsArray);
         },
@@ -453,15 +577,27 @@
             return valueIsValid ? this : ret;
         },
 
-        before : function () {
-            var newElementsArray = doElementOperationOnEach.call(this, JSL.toArray(arguments), function (baseElement, newElement) {
-                var parent = baseElement.parentNode;
+        before : function (passedElement) {
+            var newElementsArray = [];
+                passedElement = handleHTMLcreation(passedElement);
 
-                // add the newElement before the current element
-                if (parent) {
-                    parent.insertBefore(newElement, baseElement);
-                }
-            });
+            // filter null/undefined values
+            if (passedElement != null) {
+                this.each(function (element) {
+                    var newElement = cloneElement(passedElement),
+                        parent = element.parentNode;
+
+                    if (parent) {
+                        // add the new elements to the new elements array
+                        // this is so that what's returned is a JSL object
+                        // containing the new elements, not the old ones
+                        addNewReturnElements(newElement, newElementsArray);
+
+                        // add the newElement before the current element
+                        parent.insertBefore(newElement, element);
+                    }
+                });
+            }
 
             return JSL(newElementsArray);
         },
@@ -476,14 +612,19 @@
         },
 
         clone : function () {
-            var clonedElements = core.map.call(this, cloneElement); // variable for clarity
-            return JSL(clonedElements);
+            // shallow cloning, at the moment
+            return JSL(
+                core.map.call(this, function (thisElement) {
+                    return cloneElement(thisElement);
+                })
+            );
         },
 
         css : function (name, value) {
             if (typeof name === 'string') {
-                // convert the hyphenated string to camel-case
-                name = toCamelCase(name);
+                name = name.toLowerCase().replace(rHyphenated, function (thisMatch) {
+                    return thisMatch.substring(1).toUpperCase();
+                });
 
                 if (typeof value === 'string') {
                     return this.each(function (thisElement) {
@@ -494,16 +635,16 @@
                 }
 
                 return core.map.call(this, pluck, 'style.' + name).join('');
-            } else {
-                return this;
             }
+
+            // return JSL object if name isn't a string
+            return this;
         },
 
         each : function (fn, oThis) {
-            if (this.exists) {
+            if (this.length > 0) {
                 JSL.each(this, fn, oThis);
             }
-
             return this;
         },
 
@@ -514,16 +655,21 @@
         filter : function (selector) {
             var newElementsArray = [];
 
-            if (typeof selector === 'string') {
+            if ( typeof selector === 'string' && rSelector.test(selector) ) {
                 this.each(function (thisElement) {
-                    if ( matchesSelector(thisElement, selector) ) {
+                    var docFrag = document.createDocumentFragment(),
+                        thisElementClone = thisElement.cloneNode(false); // non-deep search
+                        docFrag.appendChild(thisElementClone);
+
+                    if ( docFrag.querySelector(selector) ) {
                         newElementsArray.push(thisElement);
                     }
                 });
+
+                return JSL(newElementsArray);
             }
 
-            // returns an empty JSL object if no elements are matched
-            return JSL(newElementsArray);
+            return null;
         },
 
         find : function (selector) {
@@ -531,9 +677,8 @@
                 var matches = thisElement.querySelectorAll(selector);
                 return JSL.toArray(matches);
             });
-            var singleArrayOfMatches = arrayOfMatchesArrays.length > 0 ?
-                core.reduce.call(arrayOfMatchesArrays, function (a, b) {
-                    return core.concat.call(a, b);
+            var singleArrayOfMatches = arrayOfMatchesArrays.length > 0 ? core.reduce.call(arrayOfMatchesArrays, function (a, b) {
+                return core.concat.call(a, b);
             }) : [];
 
             return JSL(singleArrayOfMatches);
@@ -555,21 +700,7 @@
 
         get height() {
             var arrayOfElemHeights = core.map.call(this, pluck, 'offsetHeight');
-            return core.reduce.call(arrayOfElemHeights, sum);
-        },
-
-        has : function (selector) {
-            var newElementsArray = [];
-
-            if ( typeof selector === 'string' && selector.match(rSelector) ) {
-                this.each(function (thisElement) {
-                    if ( JSL(selector, thisElement).exists ) {
-                        newElementsArray.push(thisElement);
-                    }
-                });
-            }
-
-            return JSL(newElementsArray);
+            return core.reduce.call(arrayOfElemHeights, sumInt);
         },
 
         hide : function () {
@@ -593,17 +724,7 @@
         */
 
         is : function (selector) {
-            for (var i = 0; i < this.length; i += 1) {
-                if ( matchesSelector(this[i], selector) ) {
-                    return true;
-                }
-            }
-            
-            return false;
-        },
-        
-        isnt : function (selector) {
-            return !this.is(selector);
+            return this.filter(selector).exists;
         },
 
         last : function (selector) {
@@ -617,9 +738,9 @@
         not : function (selector) {
             var newElementsArray = [];
 
-            if ( typeof selector === 'string' && selector.match(rSelector) ) {
+            if ( typeof selector === 'string' && rSelector.test(selector) ) {
                 this.each(function (thisElement) {
-                    if ( JSL(thisElement).isnt(selector) ) {
+                    if ( !JSL(thisElement).is(selector) ) {
                         newElementsArray.push(thisElement);
                     }
                 });
@@ -632,14 +753,27 @@
             return JSL( getEachElements(this, selector, 'parentNode', 1) );
         },
 
-        prepend : function () {
-            var newElementsArray = doElementOperationOnEach.call(this, JSL.toArray(arguments), function (baseElement, newElement) {
-                var firstChild = baseElement.firstChild;
+        prepend : function (passedElement) {
+            var newElementsArray = [];
+                passedElement = handleHTMLcreation(passedElement);
 
-                if (firstChild) {
-                    baseElement.insertBefore(newElement, firstChild);
-                }
-            });
+            // filter null/undefined values
+            if (passedElement != null) {
+                this.each(function (thisElement) {
+                    var newElement = cloneElement(passedElement),
+                        firstChild = thisElement.firstChild;
+
+                    if (firstChild) {
+                        // add the new elements to the new elements array
+                        // this is so that what's returned is a JSL object
+                        // containing the new elements, not the old ones
+                        addNewReturnElements(newElement, newElementsArray);
+
+                        // add the newElement before the current element's first child
+                        thisElement.insertBefore(newElement, firstChild);
+                    }
+                });
+            }
 
             return JSL(newElementsArray);
         },
@@ -649,18 +783,14 @@
         },
 
         prop : function (name, value) {
-            var valueIsValid = value != null, ret;
+            var ret = '', valueIsValid = value != null;
 
             if (typeof name === 'string' && this.exists) {
                     this.each(function (thisElement) {
                         if (valueIsValid) {
                             thisElement[name] = value;
                         } else {
-                            if (typeof ret === 'undefined') {
-                                ret = thisElement[name];
-                            } else {
-                                ret += thisElement[name];
-                            }
+                            ret += thisElement[name] || '';
                         }
                     });
             }
@@ -681,32 +811,35 @@
             });
         },
 
-        removeAttribute : function (attributeName) {
-            return this.each(function (thisElement) {
-                thisElement.removeAttribute(attributeName);
-            });
-        },
-
         removeEvent : function (type) {
             return this.each(function (thisElement) {
                 JSL.removeEvent(thisElement, type);
             });
         },
 
-        replace : function () {
-            var newElementsArray = doElementOperationOnEach.call(this, JSL.toArray(arguments), function (baseElement, newElement) {
-                var parent = baseElement.parentNode;
+        replace : function (passedElement) {
+            var newElementsArray = [];
+                passedElement = handleHTMLcreation(passedElement);
 
-                if (parent) {
-                    parent.replaceChild(newElement, baseElement);
+            this.each(function (element) {
+                var newElement = cloneElement(passedElement),
+                    parent = element.parentNode;
+
+                if (element && parent) {
+                    // add the new elements to the new elements array
+                    // this is so that what's returned is a JSL object
+                    // containing the new elements, not the old ones
+                    addNewReturnElements(newElement, newElementsArray);
+
+                    parent.replaceChild(newElement, element);
                 }
-            });
+            }, this);
 
             return JSL(newElementsArray);
         },
 
         show : function (value) {
-            value = typeof value === 'string' ? value : 'inline';
+            value = typeof value === 'string' && value !== '' ? value : 'inline';
             return this.css('display', value);
         },
         
@@ -715,20 +848,21 @@
             if (typeof passedText === 'string') {
                 if (append !== true) {
                     this.each(function (thisElement) {
-                        JSL('.//text()', thisElement).each(function (textNode) {
-                            textNode.data = '';
+                        walkTheDom(thisElement, function (thisChildElement) {
+                            if (thisChildElement.nodeType === 3) {
+                                thisChildElement.nodeValue = '';
+                            }
                         });
                     });
                 }
 
-                this.append('text', passedText);
+                this.append( JSL.create('text', passedText) );
+
                 return this;
             }
 
             // handle getting text
-            return core.reduce.call(this, function (curValue, nextElement) {
-                return curValue + nextElement.textContent;
-            }, '');
+            return core.map.call(this, pluck, 'textContent').join('').trim();
         },
 
         toggle : function () {
@@ -743,88 +877,13 @@
             });
         },
 
-        value : function (passedValue) {
-            var elem = this[0],
-                tagName = elem && elem.tagName || '',
-                selectedOptions = [],
-                rInputTypeBlacklist = /button|checkbox|file|image|radio|reset|submit/,
-                passedValueType = JSL.typeOf(passedValue);
-
-            if (passedValue == null) {
-                // no arguments were passed, return a value
-                    if (tagName === 'SELECT') {
-                        if ( elem.hasAttribute('multiple') ) {
-                            JSL.each(elem.options, function (thisOption) {
-                                if (thisOption.selected) {
-                                    selectedOptions.push(thisOption.value);
-                                }
-                            });
-
-                            return selectedOptions;
-                        } else {
-                            return elem.options[elem.selectedIndex].value;
-                        }
-                    } else if ( tagName === 'INPUT' && !elem.type.match(rInputTypeBlacklist) ) {
-                        return elem.value;
-                    }
-                    if (tagName === 'TEXTAREA') {
-                        return elem.value;
-                    }
-            } else {
-                // an argument was passed, set the value on each element
-                return this.each(function (thisElement) {
-                    var tagName = thisElement.tagName;
-
-                    if (tagName === 'SELECT') {
-                        if (thisElement.hasAttribute('multiple') && passedValueType === 'array') {
-                                JSL.each(thisElement.options, function (thisOption) {
-                                    JSL.each(passedValue, function (thisPassedValue) {
-                                        if (thisOption.value == thisPassedValue) {
-                                            thisOption.selected = true;
-                                            return 'stop';
-                                        } else {
-                                            thisOption.selected = false;
-                                        }
-                                    });
-                                });
-                        } else {
-                            JSL.each(thisElement.options, function (thisOption) {
-                                thisOption.selected = thisOption.value == passedValue;
-                            });
-                        }
-                    } else if (tagName === 'INPUT') {
-                        if ( !thisElement.type.match(rInputTypeBlacklist) ) {
-                            thisElement.value = passedValue;
-                        } else if (thisElement.type === 'checkbox' || thisElement.type === 'radio') {
-                            if (passedValueType === 'array') {
-                                JSL.each(passedValue, function (thisPassedValue) {
-                                    if (thisElement.value == thisPassedValue) {
-                                        thisElement.checked = true;
-                                        return 'stop';
-                                    } else {
-                                        thisElement.checked = false;
-                                    }
-                                });
-                            } else if (thisElement.value == passedValue) {
-                                 thisElement.checked = true;
-                            }
-                        }
-                    } else if (tagName === 'TEXTAREA') {
-                        thisElement.value = passedValue;
-                    }
-                });
-            }
-
-            return null;
-        },
-
         get visible() {
             return Math.max(this.width, this.height) > 0;
         },
 
         get width() {
             var arrayOfElemHeights = core.map.call(this, pluck, 'offsetWidth');
-            return core.reduce.call(arrayOfElemHeights, sum);
+            return core.reduce.call(arrayOfElemHeights, sumInt);
         },
     };
 
@@ -844,7 +903,7 @@
         }
     };
 
-    // --- STARTLING LINE FOR THE DIRECT JSL METHODS
+    // these methods will get added directly to 'JSL'
     JSL.extend({
         addEvent : function (thisElement, type, fn) {
             if (thisElement != null && typeof type === 'string' && typeof fn === 'function') {
@@ -861,6 +920,10 @@
             }
         },
 
+        // adds a script tag to the page
+        // syntax: JSL.addScript( 'var x = 0;' , null , head_node )
+        // 2nd argument required but technically optional. it will set the ID of the script tag. pass it null if you want a random ID
+        // 3rd argument optional. it will add the style tag to the head if omitted
         addScript : function (contents, id, node) {
             var newElement = document.createElement('script');
             newElement.id = id || ( 'jsl-script-' + JSL.random(999) );
@@ -876,6 +939,10 @@
             };
         },
 
+        // adds a style to the node you want, or the head node of the current document
+        // syntax: JSL.addStyle( '.classname { color: red; }' , document )
+        // 2nd argument is optional
+        // 3rd argument is optional
         addStyle : function (css, id, node) {
             id = id || ( 'jsl-style-' + JSL.random(999) );
             node = node || document.head || document.querySelector('html > head');
@@ -886,12 +953,6 @@
             }
         },
 
-        alias : function (newAlias) {
-            if (typeof newAlias === 'string' && newAlias.match(rValidVarname) && typeof window[newAlias] === 'undefined') {
-                window[newAlias] = JSL;
-            }
-        },
-
         clearInterval : function (index) {
             if (typeof index === 'number' && index < intervals.length) {
                 window.clearTimeout( intervals[index] );
@@ -899,88 +960,83 @@
             }
         },
 
+        // return a created element
+        // syntax: JSL.create( 'div' , {id : 'some_id', style : 'color: red;' }, [ create('text', 'This is a red div') ] )
+        // 1st argument: the tag name of the element you wish to create. OR 'text' and a text node will be created with the 2nd argument's text
+        // 2nd argument (optional): an object with attributes to set to the element
+        // 3rd argument (optional): an array of children, created with this function, to be added to the element
         create : function (elementName, descObj, kidsArray) {
-            var argsLength = arguments.length,
-                typeValue, prop, val, HTMLholder, ret, i;
+            var prop, val, HTMLholder, documentFragment, ret;
 
-            // handle text node creation and HTML strings
-            if (argsLength === 2 && elementName === 'text' && typeof descObj === 'string') {
+            // handle text node creation
+            // and HTML strings
+            if (elementName === 'text' && typeof descObj === 'string') {
                 return document.createTextNode(descObj);
-            } else if ( argsLength === 1 && typeof elementName === 'string' && elementName.match(rHTML) ) {
+            } else if ( typeof elementName === 'string' && rHTML.test(elementName) ) {
                 // take the HTML string and put it inside a div
                 HTMLholder = document.createElement('div');
                 HTMLholder.innerHTML = elementName;
 
-                // add each childNode to an array to return
-                ret = [];
-                ret.push.apply(ret, HTMLholder.childNodes);
-                return ret.length > 0 ? (ret.length === 1 ? ret[0] : ret) : null;
-            } else if (argsLength > 1 && typeof elementName === 'string' && typeof descObj === 'object') {
-                ret = document.createElement(elementName + '');
+                // create a document fragment, and add each of the div's children into the document fragment
+                // it would be similar to modifying documentFragment.innerHTML, if it were possible
+                documentFragment = document.createDocumentFragment();
+                JSL.each(HTMLholder.childNodes, function (child) {
+                    documentFragment.appendChild( child.cloneNode(true) );
+                });
 
+                return documentFragment;
+            }
+
+            ret = document.createElement(elementName + '');
+
+            if (typeof descObj === 'object') {
                 for (prop in descObj) {
                     if ( core.hasOwnProperty.call(descObj, prop) ) {
                         val = descObj[prop];
                         if (prop.indexOf('on') === 0 && typeof val === 'function') {
                             JSL.addEvent(ret, prop.substring(2), val);
-                        } else if ( prop !== 'style' && prop !== 'class' && prop in ret && typeof ret[prop] !== 'undefined' ) {
+                        } else if ( prop in ret && typeof ret[prop] !== 'undefined' ) {
                             ret[prop] = val;
                         } else {
                             ret.setAttribute(prop, val);
                         }
                     }
                 }
-
-                if (JSL.typeOf(kidsArray) === 'array') {
-                    JSL.each(kidsArray, function (kid) {
-                        var val, item, i;
-
-                        if (typeof kid === 'string') {
-                            val = JSL.create(kid)
-
-                            if (JSL.typeOf(val) === 'array') {
-                                for (i = 0; i < val.length; i += 1) {
-                                    ret.appendChild( val[i] );
-                                }
-                            } else if (JSL.typeOf(kid) === 'element') {
-                                ret.appendChild(kid);
-                            }
-                        } else if (JSL.typeOf(kid) === 'element') {
-                            ret.appendChild(kid);
-                        }
-                    });
-                }
-
-                return ret;
-            } else if (argsLength === 1 && JSL.typeOf(elementName) === 'element') {
-                return elementName;
             }
+
+            if (JSL.typeOf(kidsArray) === 'array') {
+                JSL.each(kidsArray, function (kid) {
+                    if (typeof kid === 'string') {
+                        ret.appendChild( JSL.create(kid) );
+                    } else if (typeof kid === 'object') {
+                        ret.appendChild(kid);
+                    }
+                });
+            }
+
+            return ret;
         },
 
         each : function (passedArray, fn, oThis) {
-            var isOthisUndefined = typeof oThis !== 'undefined',
-                index, len, otherThis, value;
-
-            for (index = 0; index < passedArray.length; index += 1) {
-                value = passedArray[index];
-                otherThis = isOthisUndefined ? oThis : value;
-                if (fn.call(otherThis, value, index, passedArray) === 'stop') {
-                    break;
-                }
-            }
+            core.forEach.call(passedArray, function (value, index, array) {
+                var otherThis = typeof oThis !== 'undefined' ? oThis : value;
+                fn.call(otherThis, value, index, array);
+            }, oThis);
         },
 
         loop : function (maxIterations, fn) {
             var args = JSL.toArray(arguments), i;
 
-            if (typeof maxIterations === 'number' && maxIterations > 0 && typeof fn === 'function') {
-                args = args.slice(2);
+            if (maxIterations > 0 && fn) {
+                args = [].slice.call(args, 2);
                 for (i = 0; i < maxIterations; i += 1) {
                     fn.apply(null, args);
                 }
             }
         },
 
+        // return a random integer between 0 and max
+        // syntax: JSL.random( 50 )
         random : function (maxInteger) {
             var rand = 0;
 
@@ -994,16 +1050,19 @@
         removeEvent : function (thisElement, type) {
             JSL.each(handlers.get(thisElement, type), function (thisEventObj) {
                 if (typeof thisElement.removeEventListener === 'function') {
+                    //alert( obj_toString(thisEventObj) );
                     thisEventObj.element.removeEventListener(thisEventObj.type, thisEventObj.fn, false);
                 } else if (typeof thisElement.detachEvent === 'function') {
                     type = 'on' + type;
                     thisEventObj.element.detachEvent(thisEventObj.type, thisEventObj.fn);
                 }
 
-                handlers.remove(thisElement, type);
+                //handlers.remove(thisElement, type);
             });
         },
 
+        // run a function at a specified document readyState
+        // syntax: JSL.runAt( 'complete', someFunc [, thisValue] [, ...otherArguments] );
         runAt : function (state, func, oThis) {
             var args = JSL.toArray(arguments), intv,
 
@@ -1037,6 +1096,9 @@
             }
         },
 
+        // setInterval is unreliable. this is a replacement for it using setTimeout with drift accomodation
+        // syntax: JSL.setInterval(func, delay)
+        // runs exactly like a real setInterval, but it's based on setTimeout, which is more reliable
         setInterval : function (func, delay) {
             var index = intervals.length,
                 delay_orig = delay,
@@ -1072,6 +1134,8 @@
             return index;
         },
 
+        // converts a list of some sort to an array (e.g., NodeList, HTMLCollection, 'arguments' parameter, xpath snapshots, etc)
+        // syntax: JSL.toArray( some_list )
         toArray : function (arr) {
             var newArr = [], // new array to store the values into
                 len = arr.length || arr.snapshotLength,
@@ -1085,39 +1149,24 @@
                 } else {
                     // if the specified 'list' is array-like, use slice on it
                     // to convert it to an array
-                    newArr = core.slice.call(arr, 0);
+                    newArr = [].slice.call(arr, 0);
                 }
+
+                return newArr;
             }
 
-            return newArr;
+            return [];
         },
-        /*
-        toString : function (item) {
-            switch( JSL.typeOf(item) ) {
-                case 'object': {
-                    // todo
-                }
-                case 'array': {
-                    // todo
-                }
-                case 'string': case 'number': {
-                    return item + '';
-                }
-                default: {
-                    return core.toString.call(item);
-                }
-            }
-        },
-        */
+
         // typeOf by Douglas Crockford. modified by JoeSimmons
         typeOf : function (value) {
             var s = typeof value,
                 ostr = core.toString.call(value);
-            if (s === 'object' || s === 'function') {
+            if (s === 'object') {
                 if (value) {
                     if (ostr === '[object Array]') {
                         s = 'array';
-                    } else if ( ostr === '[object Text]' || ostr.match(rElementObject) ) {
+                    } else if (ostr.indexOf('Element]') !== -1) {
                         s = 'element';
                     } else if (ostr === '[object HTMLCollection]') {
                         s = 'collection';
@@ -1133,29 +1182,8 @@
             return s;
         },
 
-        /* to-do
-        waitFor : function (info) {
-            // function to wait for an element to be loaded,
-            //     and optionally wait until a verifier function
-            //     called returns true to load a 'done' callback
-                {
-                    selector : '#foo',
-
-                    context : bar,
-
-                    time : 10,
-
-                    verifier : function (elem) {
-                        return elem != null && elem.tagName === 'SPAN';
-                    },
-
-                    done : function (elem) {
-                        doCallback(elem);
-                    }
-                }
-        },
-        */
-
+        // return an xpath result    (type + context are optional)
+        // syntax: JSL.xpath( { expression : '//a', type : 6, context : document } )
         xpath : function (obj) {
             var type = obj.type || 7,
                 types = {
@@ -1167,14 +1195,7 @@
                 },
                 expression = obj.expression,
                 context = obj.context || document,
-                doc = document, xp;
-
-                if (typeof context.evaluate === 'function') {
-                    doc = context;
-                } else if (typeof context.ownerDocument.evaluate === 'function') {
-                    doc = context.ownerDocument;
-                }
-
+                doc = typeof context.evaluate === 'function' ? context : document,
                 xp = doc.evaluate(expression, context, null, type, null);
 
             if (!expression) {
@@ -1193,38 +1214,4 @@
     // assign JSL to the window object
     window.JSL = window._J = JSL;
 
-    // just for testing purposes
-    // unsafeWindow.JSL = unsafeWindow._J = JSL;
-
 }(window));
-
-/* 
-// JSL test button
-// use it to test code on user click (non-automatic)
-(function () {
-    var mo = new MutationObserver(function (mutations) {
-        mutations.forEach(function (mutation) {
-            var target = mutation.target;
-
-            if (mutation.attributeName === 'value' && target.value !== 'Run JSL test') {
-                target.value = 'Run JSL test';
-            }
-        });
-    });
-
-    JSL(document.body).append(
-        'input',
-        {
-            id : 'jsl_user_test',
-            type : 'button',
-            value : 'Run JSL test',
-            style : 'display: block; position: fixed; top: 4px; right: 4px; z-index: 999999; padding: 2px 14px; font-size: 11pt; font-family: Arial, Verdana;',
-            onclick : function () {
-                JSL('body input').value('radio2');
-            }
-        }
-    );
-
-    mo.observe( JSL('#jsl_user_test')[0], { attributes : true } );
-}());
- */
