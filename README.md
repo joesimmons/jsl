@@ -17,10 +17,7 @@ For API documentation, check the [methods][methods] page.
 ---
 
 ### TO-DO
-  * allow `JSL.random()` to accept a second argument (minimum integer)
   * add `.inView` or a similar method to determine if an element is in the browser's viewport
-  * add `JSL.toString()` - will return a string containing the best way to represent the passed value's contents
-  * add `JSL.waitFor()` - very similar to waitForKeyElements but with a verifier function
 
   [gm]: https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/
   [methods]: https://github.com/joesimmons/jsl/wiki/_pages

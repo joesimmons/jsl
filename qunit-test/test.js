@@ -21,11 +21,11 @@ id('test-p')
 test("JSL init", function () {
     expect(6);
 
-    equal( JSL().length, 0, "JSL() length equal to zero" );
-    equal( JSL(undefined).length, 0, "JSL(undefined) === JSL([])" );
-    equal( JSL(null).length, 0, "JSL(null) === JSL([])" );
-    equal( JSL("").length, 0, "JSL('') === JSL([])" );
-    equal( JSL("#").length, 0, "JSL('#') === JSL([])" );
+    equal( JSL().length, 0, 'JSL() length equal to zero' );
+    equal( JSL(undefined).length, 0, 'JSL(undefined) === JSL([])' );
+    equal( JSL(null).length, 0, 'JSL(null) === JSL([])' );
+    equal( JSL('').length, 0, 'JSL(\'\') === JSL([])' );
+    equal( JSL('#').length, 0, 'JSL(\'#\') === JSL([])' );
     equal( JSL(window).length, 1, 'Correct number of elements generated for JSL(window)' );
 });
 
@@ -37,6 +37,72 @@ test("JSL context", function () {
     strictEqual( JSL('div p', '#qunit-fixture')[0], id('test-p'), 'Selector with string as context' );
     strictEqual( JSL('div p', id('qunit-fixture'))[0], id('test-p'), 'Selector with element as context' );
     strictEqual( JSL('div p', JSL('#qunit-fixture'))[0], id('test-p'), 'Selector with JSL object as context' );
+});
+
+// ----------------------------------------------------------------------------------------------------------------------
+
+test("JSL.loop(maxIterations, fn)", function () {
+    var JslLoopIter = 0; // unique var name to reduce problems (instead of using i)
+
+    expect(1);
+
+    JSL.loop(5, function () {
+        JslLoopIter += 1;
+    });
+
+    equal( JslLoopIter, 5, 'Correct loop amount' );
+});
+
+// ----------------------------------------------------------------------------------------------------------------------
+
+test("JSL.random(maxInteger, minInteger)", function () {
+    var o1 = {},
+        o2 = {},
+        iters = 1000,
+        isRangeValid, tmp,
+        JslRandomIter; // unique var name to reduce problems (instead of using i)
+
+    expect(3);
+
+    for (JslRandomIter = 0, isRangeValid = true; JslRandomIter < iters; JslRandomIter += 1) {
+        tmp = JSL.random(50);
+        if (tmp < 0 || tmp > 50) {
+            isRangeValid = false;
+        }
+    }
+    ok( isRangeValid, 'Correct range for JSL.random(50)' );
+
+    for (JslRandomIter = 0, isRangeValid = true; JslRandomIter < iters; JslRandomIter += 1) {
+        tmp = JSL.random(50, 20);
+        if (tmp < 20 || tmp > 50) {
+            isRangeValid = false;
+        }
+    }
+    ok( isRangeValid, 'Correct range for JSL.random(50, 20)' );
+
+    for (JslRandomIter = 0, isRangeValid = true; JslRandomIter < iters; JslRandomIter += 1) {
+        tmp = JSL.random(50, 0);
+        if (tmp < 0 || tmp > 50) {
+            isRangeValid = false;
+        }
+    }
+    ok( isRangeValid, 'Correct range for JSL.random(50, 0)' );
+});
+
+// ----------------------------------------------------------------------------------------------------------------------
+
+test("JSL.toString(item)", function () {
+    expect(9);
+
+    equal( JSL.toString(1), '1', 'Correct value for a number' );
+    equal( JSL.toString(5 / 0), 'NaN', 'Correct value for NaN' );
+    equal( JSL.toString('foo'), '"foo"', 'Correct value for a string' );
+    equal( JSL.toString(true), 'true', 'Correct value for a boolean' );
+    equal( JSL.toString(/foo/), '/foo/', 'Correct value for a RegExp' );
+    equal( JSL.toString( id('NonExistingID') ), 'null', 'Correct value for null' );
+    equal( JSL.toString( (function (a) { return a; })() ), 'undefined', 'Correct value for undefined' );
+    equal( JSL.toString( [1, 2, 3] ), '[\n    1,\n    2,\n    3\n]', 'Correct value for an array' );
+    equal( JSL.toString( {'a' : 1, 'b' : 2, 'c' : 3} ), '{\n    "a" : 1,\n    "b" : 2,\n    "c" : 3\n}', 'Correct value for an object' );
 });
 
 // ----------------------------------------------------------------------------------------------------------------------

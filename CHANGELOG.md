@@ -1,3 +1,14 @@
+# 1.3.0 (12/9/2013)
+```
+    - switched to the GPLv3 license
+    - added JSL.toString()
+    - added JSL.waitFor()
+    - added a second [minInteger] parameter to JSL.random()
+    - fixed JSL.random() - it would not return 0 (the default inclusive minimum)
+```
+
+---
+
 # 1.2.1 (12/2/2013)
 ```
     - added a "versions" folder for different versions of JSL
