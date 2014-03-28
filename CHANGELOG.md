@@ -1,3 +1,14 @@
+# 1.3.1 (3/28/2014)
+```
+    - switched to the LGPL license
+    - fixed a RegExp bug with identifying XPath selectors in JSL()
+    - fixed bug in .text() where you send it a number, and it would break - now it switches the text to that number
+    - made JSL only replace itself with a newer, backward-compatible version, if JSL is already on the page/scope
+    - added .focus()
+```
+
+---
+
 # 1.3.0 (12/9/2013)
 ```
     - switched to the GPLv3 license

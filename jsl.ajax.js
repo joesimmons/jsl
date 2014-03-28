@@ -1,13 +1,17 @@
 // ==UserScript==
-// @name        JSL - AJAX plugin
-// @namespace   http://userscripts.org/users/23652
-// @description An AJAX extension for JSL
-// @include     *
-// @version     1.0.21
-// @grant       GM_xmlhttpRequest
+// @name          JSL - AJAX plugin
+// @namespace     http://userscripts.org/users/23652
+// @description   An AJAX plugin for JSL
+// @include       *
+// @version       1.1.0
+//@require       https://raw.github.com/joesimmons/jsl/master/versions/jsl-1.3.1.js
+// @grant         GM_xmlhttpRequest
 // ==/UserScript==
 
 /* CHANGELOG
+
+1.1.0 (3/28/2014)
+    - added JSL.ajaxClear() to clear all current and pending requests
 
 1.0.21 (10/6/2013)
     - fixed bug with .clear()
@@ -42,7 +46,7 @@
         blank = function () {},   // blank function to use as default callback
         xhrInProgress = false,    // boolean to know if we should load the next request
         xhrCleared = false;       // boolean to know if the xhr has been cleared and if
-                                      // we should execute any of the callbacks
+                                  //     we should execute any of the callbacks
 
     var core = {
         // object
@@ -294,7 +298,8 @@
     JSL.extend({
         ajax : function (url, settings) {
             return new init(url, settings);
-        }
+        },
+        ajaxClear : init.prototype.clear
     });
 
 }());
